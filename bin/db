@@ -1,0 +1,46 @@
+#!/usr/bin/env zsh
+# db - universal database cli
+
+readonly DB_ROOT="${0:A:h:h}"
+
+source "$DB_ROOT/lib/init.zsh"
+source "$DB_ROOT/lib/commands.zsh"
+
+# Handle help early
+if [[ "${1:-}" == @(-h|--help|help|h) ]]; then
+  cmd::help
+  exit 0
+fi
+
+# Parse flags
+typeset env_file=".env"
+typeset -a cmd_args=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env=*) env_file="${1#*=}"; shift ;;
+    -v|--verbose) DB_VERBOSE=1; shift ;;
+    -q|--quiet) DB_QUIET=1; shift ;;
+    *) cmd_args+=("$1"); shift ;;
+  esac
+done
+
+# No .env? Show help
+if [[ ! -f "$env_file" ]]; then
+  cmd::help
+  echo ""
+  echo "${C_DIM}no $env_file in current directory${C_RESET}"
+  exit 0
+fi
+
+# Get URL and type
+DB_URL=$(db::parse_url "$env_file") || exit 1
+DB_TYPE=$(db::detect "$DB_URL") || exit 1
+
+db::dbg "type=$DB_TYPE url=$(db::mask "$DB_URL")"
+
+# Load adapter
+db::load_adapter "$DB_TYPE" || exit 1
+
+# Run command
+db::run "${cmd_args[@]}"

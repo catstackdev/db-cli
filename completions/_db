@@ -1,0 +1,62 @@
+#compdef db
+
+_db() {
+  local -a cmds=(
+    'psql:native client'
+    'p:native client'
+    'url:show url'
+    'u:show url'
+    'info:show info'
+    'test:test connection'
+    'ping:test connection'
+    'query:execute sql'
+    'q:execute sql'
+    'tables:list tables'
+    't:list tables'
+    'schema:table schema'
+    'count:count rows'
+    'c:count rows'
+    'dbs:list databases'
+    'list:list databases'
+    'stats:statistics'
+    'size:statistics'
+    'conn:connections'
+    'connections:connections'
+    'dump:backup'
+    'restore:restore backup'
+    'export:export data'
+    'x:export data'
+    'copy:copy table'
+    'cp:copy table'
+    'explain:query plan'
+    'history:query history'
+    'hist:query history'
+    'watch:repeat query'
+    'w:repeat query'
+    'migrate:run migrations'
+    'm:run migrations'
+    'help:show help'
+    'h:show help'
+  )
+
+  _arguments -C \
+    '--env=[env file]:file:_files' \
+    '(-v --verbose)'{-v,--verbose}'[verbose]' \
+    '(-q --quiet)'{-q,--quiet}'[quiet]' \
+    '1:command:->cmd' \
+    '*:arg:->args'
+
+  case $state in
+    cmd) _describe 'command' cmds ;;
+    args)
+      case $words[2] in
+        schema|count|c) _message 'table name' ;;
+        restore) _files -g '*.sql' -g '*.db' ;;
+        export|x) _values 'format' csv json ;;
+        *) _default ;;
+      esac
+      ;;
+  esac
+}
+
+_db "$@"
