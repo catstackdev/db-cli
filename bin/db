@@ -6,35 +6,62 @@ readonly DB_ROOT="${0:A:h:h}"
 source "$DB_ROOT/lib/init.zsh"
 source "$DB_ROOT/lib/commands.zsh"
 
+# Load user config
+db::load_config
+
 # Handle help early
-if [[ "${1:-}" == @(-h|--help|help|h) ]]; then
+if [[ "${1:-}" == (-h|--help|help|h) ]]; then
   cmd::help
   exit 0
 fi
 
-# Parse flags
-typeset env_file=".env"
+# Handle version early
+if [[ "${1:-}" == (-V|--version|version) ]]; then
+  echo "db $DB_VERSION"
+  exit 0
+fi
+
+# Parse flags (DB_ENV_FILE set by config, defaults to .env)
+typeset env_file="${DB_ENV_FILE:-.env}"
+typeset direct_url=""
+typeset profile=""
 typeset -a cmd_args=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --env=*) env_file="${1#*=}"; shift ;;
+    --var=*) DB_URL_VAR="${1#*=}"; shift ;;
+    --url=*) direct_url="${1#*=}"; shift ;;
+    -p|--profile) profile="$2"; shift 2 ;;
+    --profile=*) profile="${1#*=}"; shift ;;
+    --format=*) DB_FORMAT="${1#*=}"; shift ;;
     -v|--verbose) DB_VERBOSE=1; shift ;;
     -q|--quiet) DB_QUIET=1; shift ;;
     *) cmd_args+=("$1"); shift ;;
   esac
 done
 
-# No .env? Show help
-if [[ ! -f "$env_file" ]]; then
+# Get URL: profile > direct > env file
+if [[ -n "$profile" ]]; then
+  DB_URL=$(db::get_profile "$profile") || { db::err "unknown profile: $profile"; exit 1; }
+elif [[ -n "$direct_url" ]]; then
+  DB_URL="$direct_url"
+elif [[ -f "$env_file" ]]; then
+  DB_URL=$(db::parse_url "$env_file") || exit 1
+else
+  # Allow commands that don't need DB connection
+  case "${cmd_args[1]}" in
+    init|config|profiles|bookmarks|bm|save|rm|help|h|-h|--help|version|v|-V|--version)
+      db::run "${cmd_args[@]}"
+      exit $?
+      ;;
+  esac
   cmd::help
   echo ""
   echo "${C_DIM}no $env_file in current directory${C_RESET}"
+  echo "${C_DIM}use --url=<url> or -p <profile> to specify connection${C_RESET}"
   exit 0
 fi
-
-# Get URL and type
-DB_URL=$(db::parse_url "$env_file") || exit 1
 DB_TYPE=$(db::detect "$DB_URL") || exit 1
 
 db::dbg "type=$DB_TYPE url=$(db::mask "$DB_URL")"

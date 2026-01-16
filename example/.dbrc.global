@@ -1,0 +1,22 @@
+# Global db config
+# Location: ~/.config/db/.dbrc
+
+# === Connection ===
+DB_URL_VAR="DATABASE_URL"     # env variable name
+DB_ENV_FILE=".env"            # default env file
+
+# === Output ===
+DB_PAGER="less -S"            # pager for long output
+DB_SAMPLE_LIMIT=10            # default rows for 'sample'
+DB_SCHEMA="public"            # default schema (postgres)
+
+# === History ===
+DB_HISTORY_FILE="$HOME/.db_history"
+DB_HISTORY_SIZE=1000          # max history entries
+
+# === Backup ===
+DB_BACKUP_DIR="."             # where to save dumps
+
+# === Editor ===
+# DB_EDITOR="${EDITOR:-vim}"    # for 'db edit'
+DB_EDITOR="nvim"    # for 'db edit'

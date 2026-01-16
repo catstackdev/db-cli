@@ -1,0 +1,16 @@
+# Project db config
+# Location: .dbrc (in project root)
+# Overrides global config
+
+# This project uses different variable
+DB_URL_VAR="POSTGRES_URL"
+DB_ENV_FILE=".env.local"
+
+# Save backups in project folder
+DB_BACKUP_DIR="./backups"
+
+# More rows for sampling
+DB_SAMPLE_LIMIT=25
+
+# Use different schema
+DB_SCHEMA="app"

@@ -1,5 +1,15 @@
 #compdef db
 
+# Dynamic table completion
+_db_tables() {
+  local -a tables
+  if [[ -f .env ]]; then
+    tables=(${(f)"$(db t 2>/dev/null | tr -s ' \t' '\n' | grep -v '^$' | grep -v '^\-' | grep -v '^List' | grep -v '^Schema' | grep -v '^Name' | head -50)"})
+    [[ ${#tables} -gt 0 ]] && _describe 'table' tables
+  fi
+  return 0
+}
+
 _db() {
   local -a cmds=(
     'psql:native client'
@@ -14,16 +24,23 @@ _db() {
     'tables:list tables'
     't:list tables'
     'schema:table schema'
+    'sample:preview rows'
+    's:preview rows'
     'count:count rows'
     'c:count rows'
     'dbs:list databases'
     'list:list databases'
-    'stats:statistics'
-    'size:statistics'
-    'conn:connections'
-    'connections:connections'
+    'stats:database overview'
+    'size:database overview'
+    'top:largest tables'
+    'health:performance diagnostics'
+    'conn:active connections'
+    'connections:active connections'
     'dump:backup'
     'restore:restore backup'
+    'truncate:clear table'
+    'exec:execute sql file'
+    'e:execute sql file'
     'export:export data'
     'x:export data'
     'copy:copy table'
@@ -31,18 +48,36 @@ _db() {
     'explain:query plan'
     'history:query history'
     'hist:query history'
+    'last:re-run last query'
+    'l:re-run last query'
+    'edit:edit query in editor'
     'watch:repeat query'
     'w:repeat query'
     'migrate:run migrations'
     'm:run migrations'
+    'init:create config file'
+    'config:manage config'
+    'profiles:list profiles'
+    'save:save query bookmark'
+    'run:run saved bookmark'
+    'bookmarks:list bookmarks'
+    'bm:list bookmarks'
+    'rm:remove bookmark'
+    'version:show version'
+    'v:show version'
     'help:show help'
     'h:show help'
   )
 
   _arguments -C \
     '--env=[env file]:file:_files' \
+    '--var=[variable name]:var:(DATABASE_URL POSTGRES_URL MYSQL_URL MONGO_URI DB_CONNECTION)' \
+    '--url=[database url]:url:' \
+    '(-p --profile)'{-p,--profile}'[use profile]:profile:' \
+    '--format=[output format]:format:(table json csv)' \
     '(-v --verbose)'{-v,--verbose}'[verbose]' \
     '(-q --quiet)'{-q,--quiet}'[quiet]' \
+    '(-V --version)'{-V,--version}'[version]' \
     '1:command:->cmd' \
     '*:arg:->args'
 
@@ -50,9 +85,13 @@ _db() {
     cmd) _describe 'command' cmds ;;
     args)
       case $words[2] in
-        schema|count|c) _message 'table name' ;;
+        schema|count|c|sample|s|truncate) _db_tables ;;
         restore) _files -g '*.sql' -g '*.db' ;;
+        exec|e) _files -g '*.sql' ;;
         export|x) _values 'format' csv json ;;
+        copy|cp) _db_tables ;;
+        init) _values 'target' global project ;;
+        config) _values 'action' show get set edit ;;
         *) _default ;;
       esac
       ;;
