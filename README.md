@@ -4,7 +4,7 @@ Universal database CLI with adapter-based architecture.
 
 Supports **PostgreSQL**, **MySQL**, **SQLite**, **MongoDB**.
 
-**v1.5.0** - High-value commands, data helpers, schema management, monitoring, auto-detect.
+**v2.0.0** - Modular architecture, lazy loading, plugin system, improved performance.
 
 ## Install
 
@@ -335,26 +335,65 @@ brew install mongosh mongodb-database-tools
 db/
 ├── bin/db                  # entry point
 ├── lib/
-│   ├── init.zsh            # core helpers
-│   ├── commands.zsh        # command dispatch
-│   └── adapters/
-│       ├── postgres.zsh
-│       ├── mysql.zsh
-│       ├── sqlite.zsh
-│       └── mongodb.zsh
-├── completions/_db         # zsh completion
-└── example/
-    ├── .dbrc.global        # sample global config
-    └── .dbrc.project       # sample project config
+│   ├── core/              # core functionality
+│   │   ├── init.zsh       # constants, colors, state
+│   │   ├── config.zsh     # config management, profiles
+│   │   ├── helpers.zsh    # utility functions
+│   │   └── output.zsh     # output formatting
+│   ├── commands/          # command modules (lazy loaded)
+│   │   ├── data.zsh       # tables, schema, sample, count
+│   │   ├── query.zsh      # query, explain, watch, edit
+│   │   ├── helpers.zsh    # desc, select, where, agg
+│   │   ├── backup.zsh     # dump, restore, export, import
+│   │   ├── schema.zsh     # indexes, fk, search, diff
+│   │   ├── maintenance.zsh # vacuum, analyze, locks
+│   │   ├── monitoring.zsh # tail, changes
+│   │   ├── bookmarks.zsh  # save, run bookmarks
+│   │   ├── config.zsh     # init, config commands
+│   │   └── meta.zsh       # help, version, info
+│   ├── adapters/          # database adapters (modular)
+│   │   ├── postgres/
+│   │   │   ├── init.zsh       # core operations
+│   │   │   ├── query.zsh      # query operations
+│   │   │   ├── schema.zsh     # schema operations
+│   │   │   ├── data.zsh       # data helpers
+│   │   │   └── maintenance.zsh # maintenance
+│   │   ├── mysql/         # same structure
+│   │   ├── sqlite/        # same structure
+│   │   └── mongodb/       # same structure
+│   └── dispatch.zsh       # command routing
+├── completions/_db        # zsh completion
+├── plugins/               # custom plugins
+├── example/
+│   ├── .dbrc.global       # sample global config
+│   └── .dbrc.project      # sample project config
+├── AGENTS.md              # coding agent guidelines
+└── README.md              # this file
 ```
 
 Config locations:
 - Global: `~/.config/db/.dbrc`
 - Project: `.dbrc` (current directory)
+- Plugins: `~/.config/db/plugins/`
+
+## Development
+
+For coding agent guidelines, code style, testing commands, and contribution guidelines, see [AGENTS.md](./AGENTS.md).
 
 ## Adding New Database
 
-Create `lib/adapters/newdb.zsh` implementing:
+Create modular adapter in `lib/adapters/newdb/`:
+
+```
+lib/adapters/newdb/
+├── init.zsh         # core operations (cli, native, test, stats)
+├── query.zsh        # query operations (query, tables, schema)
+├── schema.zsh       # schema operations (indexes, fk, search)
+├── data.zsh         # data helpers (agg, distinct, nulls)
+└── maintenance.zsh  # maintenance (vacuum, analyze, locks)
+```
+
+Each adapter must implement:
 
 ```bash
 # Required
@@ -409,7 +448,7 @@ adapter::tail         # recent rows
 adapter::changes      # rows changed in time window
 ```
 
-Then add detection in `lib/init.zsh`:
+Then add detection in `lib/core/config.zsh`:
 
 ```bash
 db::detect() {
@@ -419,3 +458,13 @@ db::detect() {
   esac
 }
 ```
+
+## Key Features
+
+- **Modular Architecture**: Lazy-loaded command modules for fast startup
+- **Plugin System**: Extend functionality with custom plugins in `~/.config/db/plugins/`
+- **Adapter Pattern**: Consistent interface across all database types
+- **Security First**: SQL identifier validation prevents injection attacks
+- **Smart Defaults**: Auto-detect DATABASE_URL from Prisma, Drizzle, .env variants
+- **Interactive**: FZF integration for table/profile selection
+- **Developer Friendly**: Tab completion, query history, bookmarks
