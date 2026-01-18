@@ -4,7 +4,7 @@ Universal database CLI with adapter-based architecture.
 
 Supports **PostgreSQL**, **MySQL**, **SQLite**, **MongoDB**.
 
-**v1.2.0** - Config system, enhanced stats, health checks.
+**v1.5.0** - High-value commands, data helpers, schema management, monitoring, auto-detect.
 
 ## Install
 
@@ -34,35 +34,146 @@ DATABASE_URL="mongodb://user:pass@localhost:27017/mydb"
 
 ## Commands
 
+### Connection & Info
+
 ```bash
 db                # open interactive cli (pgcli/mycli/litecli)
+db connect        # pick profile with fzf
 db test           # test connection
+db status         # full status overview
+db info           # show type and url
+db url            # show masked url
+```
+
+### Tables & Data
+
+```bash
 db t              # list tables
-db q "SELECT 1"   # run query
 db schema users   # show table schema (fzf if no arg)
 db sample users 5 # preview first 5 rows
 db count users    # count rows (fzf if no arg)
+db size users     # detailed table size info
+db q "SELECT 1"   # run query
+```
+
+### High-Value Commands
+
+```bash
+db desc users           # table overview: schema + stats + sample
+db select users id,name 10  # query specific columns
+db where users email=foo@bar.com  # filter by conditions
+db @user-count          # run bookmark (shorthand for db run)
+db recent               # tables you've queried recently
+db er                   # generate mermaid ER diagram
+db er users             # ER diagram for specific table
+```
+
+### Data Helpers
+
+```bash
+db agg users            # count, null stats
+db agg users age        # count, min, max, avg for column
+db distinct users role  # distinct values with counts
+db null users           # null counts per column
+db dup users email      # find duplicate values
+```
+
+### Schema & Structure
+
+```bash
+db indexes users  # show indexes on table
+db fk orders      # show foreign key relationships
+db search user    # find tables/columns matching pattern
+db diff local prod # compare schemas between profiles
+db users          # list database roles/users
+db grants users   # show table permissions
+```
+
+### Schema Management
+
+```bash
+db rename old_name new_name  # rename table (with confirm)
+db drop users                # drop table (with confirm)
+db comment users "User accounts"  # set table comment
+db comment users             # show table comment
+```
+
+### Monitoring
+
+```bash
+db tail orders        # watch recent rows (live refresh)
+db tail orders 20 5   # 20 rows, 5s refresh
+db changes orders     # rows changed in last 24h
+db changes orders 48  # rows changed in last 48h
+```
+
+### Database Overview
+
+```bash
 db stats          # database overview (size, tables, version)
 db top            # largest tables by size
 db top 20         # top 20 largest tables
+db dbs            # list databases
+```
+
+### Maintenance
+
+```bash
 db health         # performance diagnostics
 db conn           # active connections
-db dbs            # list databases
+db locks          # show current locks
+db kill 12345     # terminate connection/query
+db slowlog        # slow queries (requires pg_stat_statements)
+db slowlog 20     # show top 20 slow queries
+db vacuum users   # vacuum specific table
+db vacuum         # vacuum all tables
+db analyze users  # update statistics for table
+db analyze        # update all statistics
+```
+
+### Backup & Data
+
+```bash
 db dump           # backup → backup-YYYYMMDD-HHMMSS.sql
 db restore file   # restore from backup
 db truncate users # clear table (with confirm)
 db exec file.sql  # execute sql file
 db x csv "SQL"    # export to csv
 db x json "SQL"   # export to json
+db import csv data.csv users  # import csv to table
 db cp src dest    # copy table
+```
+
+### Query Tools
+
+```bash
 db explain "SQL"  # query plan
 db hist           # query history
 db last           # re-run last query
 db edit           # edit & run query in $EDITOR
 db watch "SQL" 5  # repeat query every 5s
 db migrate        # run migrations (prisma/drizzle/knex)
-db version        # show version
-db help           # show help
+```
+
+### Config & Profiles
+
+```bash
+db init             # create .dbrc in current dir
+db init global      # create ~/.config/db/.dbrc
+db config           # show current config
+db config set DB_SAMPLE_LIMIT 20
+db config edit      # open .dbrc in editor
+db profiles         # list all profiles
+```
+
+### Bookmarks
+
+```bash
+db save user-count "SELECT COUNT(*) FROM users"
+db run user-count   # execute saved query
+db @user-count      # shorthand for db run
+db bookmarks        # list all
+db rm user-count    # delete
 ```
 
 ## Flags
@@ -73,6 +184,9 @@ db help           # show help
 --url=URL       # use url directly (skip .env)
 -p, --profile   # use named profile from .dbrc
 --format=FMT    # output format (table/json/csv)
+-w, --wide      # show all columns (no truncation)
+--cols=N        # limit number of columns displayed
+--col-width=N   # max column width (default: 30)
 -v, --verbose   # debug output
 -q, --quiet     # no confirmations
 -V, --version   # show version
@@ -109,6 +223,15 @@ DB_BACKUP_DIR="."             # where to save dumps
 # === Editor ===
 DB_EDITOR="${EDITOR:-vim}"    # for 'db edit'
 
+# === Behavior ===
+DB_AUTO_DETECT=true           # auto-detect from Prisma, Drizzle
+DB_CONFIRM_DESTRUCTIVE=true   # confirm truncate, restore, vacuum
+DB_SHOW_QUERY_TIME=false      # show query execution time
+
+# === Table Display ===
+DB_COL_WIDTH=30               # max column width (0=unlimited)
+DB_MAX_COLS=0                 # max columns to show (0=all)
+
 # === Profiles (named connections) ===
 DB_PROFILES=(
   [local]="postgres://localhost/mydb"
@@ -135,37 +258,19 @@ DB_PROFILES=(
 db -p local tables
 db -p prod stats
 db profiles         # list all profiles
-```
-
-## Bookmarks
-
-Save frequently used queries:
-
-```bash
-db save user-count "SELECT COUNT(*) FROM users"
-db save active-users "SELECT * FROM users WHERE active=true"
-db run user-count   # execute saved query
-db bookmarks        # list all
-db rm user-count    # delete
-```
-
-## Config Commands
-
-```bash
-db init             # create .dbrc in current dir
-db init global      # create ~/.config/db/.dbrc
-db config           # show current config
-db config set DB_SAMPLE_LIMIT 20
-db config edit      # open .dbrc in editor
-db config edit global
+db connect          # pick with fzf
+db diff local prod  # compare schemas
 ```
 
 ## Features
 
 - **Security**: SQL identifier validation prevents injection attacks
-- **FZF Integration**: Interactive table selection when no arg provided
-- **Dynamic Completions**: Tab-complete table names from your database
+- **FZF Integration**: Interactive table/profile selection when no arg provided
+- **Dynamic Completions**: Tab-complete table names and profiles
 - **Flexible Config**: Custom env variable names via config or flags
+- **Query Timing**: Optional execution time display
+- **Auto-Detect**: Finds DATABASE_URL from Prisma, Drizzle, .env.local automatically
+- **ER Diagrams**: Generate Mermaid diagrams of your schema
 
 ## Examples
 
@@ -188,6 +293,24 @@ db x csv "SELECT * FROM users" users.csv
 
 # Watch active orders
 db watch "SELECT COUNT(*) FROM orders WHERE status='pending'" 10
+
+# Schema comparison
+db diff local staging
+
+# Find all user-related columns
+db search user
+
+# Check slow queries
+db slowlog 20
+
+# Maintenance
+db vacuum users && db analyze users
+
+# Table display options
+db sample users              # default: 30 char columns
+db sample users --wide       # show all columns, no truncation
+db sample users --cols=5     # show only first 5 columns
+db sample users --col-width=50  # wider columns
 ```
 
 ## Requirements
@@ -234,20 +357,56 @@ Config locations:
 Create `lib/adapters/newdb.zsh` implementing:
 
 ```bash
-adapter::cli        # interactive client
-adapter::native     # native client with args
-adapter::query      # execute sql
-adapter::tables     # list tables
-adapter::schema     # table schema
-adapter::count      # row count
-adapter::test       # connection test
-adapter::stats      # statistics
-adapter::dump       # backup
-adapter::restore    # restore
-adapter::explain    # query plan
-adapter::dbs        # list databases
-adapter::export     # export data
-adapter::copy       # copy table
+# Required
+adapter::cli          # interactive client
+adapter::native       # native client with args
+adapter::query        # execute sql
+adapter::tables       # list tables
+adapter::tables_plain # list tables (plain, for fzf)
+adapter::schema       # table schema
+adapter::count        # row count
+adapter::sample       # preview rows
+adapter::test         # connection test
+adapter::stats        # statistics
+adapter::dump         # backup
+adapter::restore      # restore
+adapter::truncate     # clear table
+adapter::exec         # execute file
+adapter::explain      # query plan
+adapter::dbs          # list databases
+adapter::export       # export data
+adapter::copy         # copy table
+adapter::top          # largest tables
+adapter::health       # performance diagnostics
+adapter::connections  # active connections
+
+# New in v1.4
+adapter::indexes      # table indexes
+adapter::fk           # foreign keys
+adapter::locks        # current locks
+adapter::kill         # terminate connection
+adapter::slowlog      # slow queries
+adapter::vacuum       # vacuum/optimize
+adapter::analyze      # update statistics
+adapter::search       # search tables/columns
+adapter::diff         # compare schemas
+adapter::table_size   # detailed table size
+adapter::users        # list users/roles
+adapter::grants       # table permissions
+
+# New in v1.5
+adapter::import       # import csv/json
+adapter::er           # ER diagram (mermaid)
+adapter::agg          # aggregate stats
+adapter::distinct     # distinct values
+adapter::nulls        # null counts
+adapter::dup          # find duplicates
+adapter::rename       # rename table
+adapter::drop         # drop table
+adapter::comment      # set table comment
+adapter::get_comment  # get table comment
+adapter::tail         # recent rows
+adapter::changes      # rows changed in time window
 ```
 
 Then add detection in `lib/init.zsh`:

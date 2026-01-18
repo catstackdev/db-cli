@@ -10,15 +10,36 @@ _db_tables() {
   return 0
 }
 
+# Dynamic profile completion
+_db_profiles() {
+  local -a profiles
+  profiles=(${(f)"$(db profiles 2>/dev/null | grep -v '^===' | grep -v '^no profiles' | cut -d: -f1)"})
+  [[ ${#profiles} -gt 0 ]] && _describe 'profile' profiles
+  return 0
+}
+
+# Dynamic bookmark completion
+_db_bookmarks() {
+  local -a bookmarks
+  bookmarks=(${(f)"$(db bookmarks 2>/dev/null | grep -v '^===' | grep -v '^no bookmarks' | awk '{print $1}')"})
+  [[ ${#bookmarks} -gt 0 ]] && _describe 'bookmark' bookmarks
+  return 0
+}
+
 _db() {
   local -a cmds=(
+    # Connection
     'psql:native client'
     'p:native client'
+    'connect:interactive profile picker'
     'url:show url'
     'u:show url'
     'info:show info'
+    'status:full status overview'
     'test:test connection'
     'ping:test connection'
+
+    # Query & Data
     'query:execute sql'
     'q:execute sql'
     'tables:list tables'
@@ -28,14 +49,59 @@ _db() {
     's:preview rows'
     'count:count rows'
     'c:count rows'
+    'size:detailed table size'
     'dbs:list databases'
     'list:list databases'
     'stats:database overview'
-    'size:database overview'
     'top:largest tables'
+
+    # High-value commands
+    'desc:table overview (schema + stats + sample)'
+    'd:table overview'
+    'select:query table with columns'
+    'sel:query table with columns'
+    'where:filter rows by condition'
+    'import:import csv/json to table'
+    'er:generate ER diagram (mermaid)'
+    'recent:show recently queried tables'
+
+    # Data helpers
+    'agg:aggregate stats (count, min, max)'
+    'distinct:distinct values with counts'
+    'uniq:distinct values with counts'
+    'null:show null counts per column'
+    'nulls:show null counts per column'
+    'dup:find duplicate values'
+    'dups:find duplicate values'
+
+    # Schema & Structure
+    'indexes:show table indexes'
+    'fk:show foreign keys'
+    'search:search tables/columns'
+    'diff:compare schemas between profiles'
+    'users:list database users'
+    'grants:show table permissions'
+
+    # Schema Management
+    'rename:rename table'
+    'drop:drop table (with confirm)'
+    'comment:set/get table comment'
+
+    # Maintenance
     'health:performance diagnostics'
     'conn:active connections'
     'connections:active connections'
+    'vacuum:run vacuum'
+    'analyze:update statistics'
+    'locks:show current locks'
+    'kill:terminate connection'
+    'slowlog:slow queries'
+
+    # Monitoring
+    'tail:watch recent rows (live)'
+    'changes:rows changed in last N hours'
+
+    # Backup & Data
     'dump:backup'
     'restore:restore backup'
     'truncate:clear table'
@@ -45,6 +111,8 @@ _db() {
     'x:export data'
     'copy:copy table'
     'cp:copy table'
+
+    # Query Tools
     'explain:query plan'
     'history:query history'
     'hist:query history'
@@ -55,14 +123,20 @@ _db() {
     'w:repeat query'
     'migrate:run migrations'
     'm:run migrations'
+
+    # Config
     'init:create config file'
     'config:manage config'
     'profiles:list profiles'
+
+    # Bookmarks
     'save:save query bookmark'
     'run:run saved bookmark'
     'bookmarks:list bookmarks'
     'bm:list bookmarks'
     'rm:remove bookmark'
+
+    # Meta
     'version:show version'
     'v:show version'
     'help:show help'
@@ -73,8 +147,11 @@ _db() {
     '--env=[env file]:file:_files' \
     '--var=[variable name]:var:(DATABASE_URL POSTGRES_URL MYSQL_URL MONGO_URI DB_CONNECTION)' \
     '--url=[database url]:url:' \
-    '(-p --profile)'{-p,--profile}'[use profile]:profile:' \
+    '(-p --profile)'{-p,--profile}'[use profile]:profile:_db_profiles' \
     '--format=[output format]:format:(table json csv)' \
+    '(-w --wide)'{-w,--wide}'[show all columns]' \
+    '--cols=[max columns]:cols:(5 10 15 20)' \
+    '--col-width=[column width]:width:(20 30 50 80)' \
     '(-v --verbose)'{-v,--verbose}'[verbose]' \
     '(-q --quiet)'{-q,--quiet}'[quiet]' \
     '(-V --version)'{-V,--version}'[version]' \
@@ -82,16 +159,60 @@ _db() {
     '*:arg:->args'
 
   case $state in
-    cmd) _describe 'command' cmds ;;
+    cmd)
+      # Handle @bookmark syntax
+      if [[ "$words[CURRENT]" == @* ]]; then
+        local -a bm_list
+        bm_list=(${(f)"$(db bookmarks 2>/dev/null | grep -v '^===' | grep -v '^no bookmarks' | awk '{print "@"$1}')"})
+        [[ ${#bm_list} -gt 0 ]] && _describe 'bookmark' bm_list
+      else
+        _describe 'command' cmds
+      fi
+      ;;
     args)
-      case $words[2] in
-        schema|count|c|sample|s|truncate) _db_tables ;;
+      local cmd=$words[2]
+      local pos=$((CURRENT - 2))  # position after command
+
+      case $cmd in
+        # Commands that take table names
+        schema|count|c|sample|s|truncate|indexes|fk|size|grants|vacuum|analyze)
+          _db_tables ;;
+        desc|d|agg|distinct|uniq|null|nulls|dup|dups)
+          _db_tables ;;
+        select|sel|where)
+          # First arg: table, then columns/conditions
+          (( pos == 1 )) && _db_tables ;;
+        rename)
+          # First arg: old table, second arg: new name
+          (( pos == 1 )) && _db_tables ;;
+        drop|comment|tail|changes)
+          _db_tables ;;
+        # File operations
         restore) _files -g '*.sql' -g '*.db' ;;
         exec|e) _files -g '*.sql' ;;
-        export|x) _values 'format' csv json ;;
+        import)
+          # import <format> <file> [table]
+          case $pos in
+            1) _values 'format' csv json ;;
+            2) _files -g '*.csv' -g '*.json' ;;
+            3) _db_tables ;;
+          esac
+          ;;
+        export|x)
+          # export <format> "query"
+          (( pos == 1 )) && _values 'format' csv json ;;
+        # Table as second arg
         copy|cp) _db_tables ;;
+        # Config operations
         init) _values 'target' global project ;;
         config) _values 'action' show get set edit ;;
+        # Profiles
+        diff) _db_profiles ;;
+        run) _db_bookmarks ;;
+        rm) _db_bookmarks ;;
+        # No completion needed
+        kill|search|er|recent) ;;
+        @*) ;;  # Bookmark already selected
         *) _default ;;
       esac
       ;;
