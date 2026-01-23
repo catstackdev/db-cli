@@ -42,6 +42,21 @@ db::valid_id() {
   [[ "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || { db::err "invalid identifier: $1"; return 1; }
 }
 
+# Validate numeric input
+db::valid_num() {
+  local num="$1"
+  local name="${2:-number}"
+  [[ "$num" =~ ^[0-9]+$ ]] || { db::err "invalid $name: $num"; return 1; }
+}
+
+# Validate positive number with range
+db::valid_range() {
+  local num="$1" min="${2:-1}" max="${3:-}"
+  db::valid_num "$num" || return $?
+  [[ $num -ge $min ]] || { db::err "must be >= $min"; return 1; }
+  [[ -z "$max" || $num -le $max ]] || { db::err "must be <= $max"; return 1; }
+}
+
 # FZF table picker (used when no table arg provided)
 db::fzf_table() {
   command -v fzf &>/dev/null || return 1

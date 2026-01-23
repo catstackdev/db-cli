@@ -9,8 +9,13 @@ typeset -gA DB_CMD_MODULE=(
 
   # query.zsh
   [query]=query [q]=query [explain]=query [watch]=query [w]=query
-  [edit]=query [history]=query [hist]=query [last]=query [l]=query
-  [migrate]=query [m]=query
+  [edit]=query [last]=query [l]=query
+
+  # migration.zsh
+  [migrate]=migration [m]=migration
+
+  # history.zsh
+  [history]=history [hist]=history
 
   # data.zsh
   [tables]=data [t]=data [schema]=data [sample]=data [s]=data
@@ -47,6 +52,25 @@ typeset -gA DB_CMD_MODULE=(
 
   # config.zsh
   [init]=config [config]=config [profiles]=config [connect]=config
+
+  # cache.zsh
+  [cache-clear]=cache [cache-info]=cache [cache-stats]=cache 
+  [refresh-cache]=cache [refresh]=cache
+
+  # transaction.zsh
+  [tx]=transaction [transaction]=transaction
+
+  # repl.zsh
+  [repl]=repl
+
+  # schema_version.zsh
+  [schema-version]=schema_version [sv]=schema_version
+
+  # backup_mgmt.zsh
+  [backup]=backup_mgmt
+
+  # seed.zsh
+  [seed]=seed [generate]=seed
 )
 
 # Lazy load command module
@@ -112,9 +136,13 @@ db::run() {
       explain) cmd::explain "$2" ;;
       watch|w) cmd::watch "$2" "$3" ;;
       edit) cmd::edit ;;
-      hist|history) cmd::history "$2" ;;
       last|l) cmd::last ;;
-      migrate|m) cmd::migrate ;;
+
+      # Migration
+      migrate|m) cmd::migrate "$2" "$3" "$4" ;;
+
+      # History
+      hist|history) cmd::history "$2" "$3" ;;
 
       # Data
       t|tables) cmd::tables ;;
@@ -182,6 +210,27 @@ db::run() {
       config) cmd::config "$2" "$3" "$4" ;;
       profiles) cmd::profiles ;;
       connect) cmd::connect ;;
+
+      # Cache
+      cache-clear) cmd::cache_clear "$2" ;;
+      cache-info|cache-stats) cmd::cache_info ;;
+      refresh-cache|refresh) cmd::refresh_cache ;;
+
+      # Transaction
+      tx|transaction) cmd::tx "$2" ;;
+
+      # REPL
+      repl) cmd::repl ;;
+
+      # Schema Version
+      schema-version|sv) cmd::schema_version "$2" "$3" "$4" ;;
+
+      # Backup
+      backup) cmd::backup "$2" "$3" "$4" ;;
+
+      # Seed
+      seed) cmd::seed "$2" "$3" "$4" ;;
+      generate) cmd::generate "$2" "$3" ;;
 
       *)
         db::err "unknown command: $cmd"

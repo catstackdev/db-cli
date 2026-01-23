@@ -4,7 +4,7 @@ Universal database CLI with adapter-based architecture.
 
 Supports **PostgreSQL**, **MySQL**, **SQLite**, **MongoDB**.
 
-**v2.0.0** - Modular architecture, lazy loading, plugin system, improved performance.
+**v2.2.0** - Data generation, seeding, transactions, history analytics, REPL, migrations, schema versioning, backup automation.
 
 ## Install
 
@@ -13,6 +13,22 @@ Supports **PostgreSQL**, **MySQL**, **SQLite**, **MongoDB**.
 export PATH="$HOME/.config/db/bin:$PATH"
 fpath=($HOME/.config/db/completions $fpath)
 ```
+
+## What's New in v2.2.0
+
+- **Data Generation**: `db generate <type> [count]` - 10 built-in generators (name, email, phone, date, bool, status, city, country, text, int)
+- **Seed Files**: `db seed create/list` - declarative table population with key=value format
+- **No Dependencies**: Pure zsh implementations - no external tools needed
+
+## What's in v2.1.0
+
+- **Transactions**: `db tx begin/commit/rollback` with auto-rollback
+- **History Analytics**: `db hist search/slow/errors/stats` with JSON format
+- **Interactive REPL**: `db repl` for multi-line SQL editing
+- **Migration Tools**: Auto-detect Prisma, Drizzle, Knex, Flyway, Liquibase
+- **Schema Versioning**: `db schema-version save/restore/diff` - git-like snapshots
+- **Backup Automation**: `db backup` with rotation, verification, cron setup
+- **Enhanced Completions**: Column names, cached tables, subcommands
 
 ## Usage
 
@@ -144,15 +160,92 @@ db import csv data.csv users  # import csv to table
 db cp src dest    # copy table
 ```
 
+### Data Generation & Seeding (NEW v2.2.0)
+
+```bash
+# Generate random data directly
+db generate names 10      # 10 random names
+db generate emails 5      # 5 email addresses
+db generate phones 3      # 3 phone numbers
+db generate dates 10      # 10 random dates (last 365 days)
+db generate int 5         # 5 random integers
+
+# Available types: name, email, phone, date, bool, status, 
+#                  city, country, text, int
+
+# Seed files for table population
+db seed create users      # create seed template for users table
+db seed seeds/users.seed  # populate table from seed file
+db seed list              # list all seed files
+
+# Seed file format (key=value pairs):
+# table = users
+# first_name = name
+# last_name = name
+# email = email
+# age = int(18,80)
+# city = city
+# status = status
+# rows = 100
+```
+
+See `examples/SEED-FORMAT.txt` for complete documentation.
+
 ### Query Tools
 
 ```bash
 db explain "SQL"  # query plan
-db hist           # query history
+db hist           # query history (20 most recent)
+db hist search "users"  # search query history
+db hist slow 500  # queries slower than 500ms
+db hist errors    # failed queries
+db hist stats     # query analytics dashboard
 db last           # re-run last query
 db edit           # edit & run query in $EDITOR
 db watch "SQL" 5  # repeat query every 5s
-db migrate        # run migrations (prisma/drizzle/knex)
+db repl           # interactive SQL mode
+```
+
+### Transactions (NEW)
+
+```bash
+db tx begin       # start transaction
+db tx commit      # commit changes
+db tx rollback    # rollback changes
+db tx status      # show transaction state
+```
+
+### Migrations (ENHANCED)
+
+```bash
+db migrate        # apply migrations (auto-detect)
+db migrate status # show migration status
+db migrate up     # apply pending migrations
+db migrate down   # rollback last migration
+db migrate create add_users  # create new migration
+db migrate detect # detect migration tool
+# Supports: Prisma, Drizzle, Knex, Flyway, Liquibase, generic SQL
+```
+
+### Schema Versioning (NEW)
+
+```bash
+db schema-version save v1.0.0     # save current schema
+db schema-version restore v1.0.0  # restore from version
+db schema-version diff v1.0.0 current  # compare schemas
+db schema-version list            # list saved versions
+db schema-version export schema.sql    # export to file
+```
+
+### Backup Automation (NEW)
+
+```bash
+db backup         # create backup with auto cleanup
+db backup list    # list all backups
+db backup cleanup 14  # keep only last 14 backups
+db backup verify file.sql.gz  # verify backup integrity
+db backup restore file.sql.gz # restore from backup
+db backup cron    # show cron setup for scheduling
 ```
 
 ### Config & Profiles

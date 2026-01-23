@@ -24,6 +24,8 @@ cmd::select() {
     return 1
   }
   shift
+  db::valid_id "$table" || return 1
+  
   local cols="*"
   local limit="$DB_SAMPLE_LIMIT"
 
@@ -31,10 +33,20 @@ cmd::select() {
   for arg in "$@"; do
     if [[ "$arg" =~ ^[0-9]+$ ]]; then
       limit="$arg"
+      db::valid_num "$limit" "limit" || return 1
     else
       cols="$arg"
     fi
   done
+
+  # Validate column names if not *
+  if [[ "$cols" != "*" ]]; then
+    for col in ${(s:,:)cols}; do
+      col="${col## }"
+      col="${col%% }"
+      db::valid_id "$col" || return 1
+    done
+  fi
 
   local sql="SELECT $cols FROM $table LIMIT $limit"
   db::dbg "query: $sql"
@@ -55,6 +67,13 @@ cmd::where() {
   for cond in "$@"; do
     local col="${cond%%=*}"
     local val="${cond#*=}"
+    
+    # Validate column name to prevent SQL injection
+    db::valid_id "$col" || return 1
+    
+    # Escape single quotes in value
+    val="${val//\'/\'\'}"
+    
     [[ -n "$conditions" ]] && conditions+=" AND "
     conditions+="$col = '$val'"
   done

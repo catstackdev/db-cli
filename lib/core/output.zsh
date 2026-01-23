@@ -113,11 +113,31 @@ db::csv() {
   cat
 }
 
-# Format output based on DB_FORMAT
+# Markdown table output
+db::markdown() {
+  awk 'BEGIN {FS="|"; OFS="|"}
+    NR==1 {print; next}
+    NR==2 {gsub(/-/, "-"); print; next}
+    {print}'
+}
+
+# YAML-like output
+db::yaml() {
+  awk -F'|' 'NR>2 && NF>1 {
+    gsub(/^[ \t]+|[ \t]+$/, "", $1)
+    gsub(/^[ \t]+|[ \t]+$/, "", $2)
+    if ($1 != "") print "  " $1 ": " $2
+  }'
+}
+
+# Format output based on DB_FORMAT or --format flag
 db::format() {
-  case "$DB_FORMAT" in
+  local fmt="${1:-$DB_FORMAT}"
+  case "$fmt" in
     json) db::json ;;
     csv)  db::csv ;;
+    md|markdown) db::markdown ;;
+    yaml|yml) db::yaml ;;
     *)    db::table ;;
   esac
 }

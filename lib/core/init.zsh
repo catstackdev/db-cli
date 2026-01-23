@@ -1,7 +1,7 @@
 # db - Core initialization
 # Constants, colors, state variables
 
-readonly DB_VERSION="2.0.0"
+readonly DB_VERSION="2.2.0"
 
 # Colors (disable with NO_COLOR=1)
 if [[ -z "${NO_COLOR:-}" ]]; then
@@ -32,3 +32,9 @@ typeset -g DB_QUIET=0
 
 # Track loaded modules for lazy loading
 typeset -gA DB_LOADED_MODULES=()
+
+# Error codes (standardized)
+readonly DB_ERR_SUCCESS=0
+readonly DB_ERR_USER=1      # User error (bad input, missing args)
+readonly DB_ERR_DB=2        # Database error (connection, query failed)
+readonly DB_ERR_NOTFOUND=3  # Not found (table, column, etc)

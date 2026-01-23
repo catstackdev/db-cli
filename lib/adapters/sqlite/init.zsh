@@ -86,6 +86,22 @@ adapter::exec() {
   sqlite3 "$(_sqlite::path)" < "$1"
 }
 
+# Transaction support
+adapter::tx_begin() {
+  _sqlite::need || return 1
+  sqlite3 "$(_sqlite::path)" "BEGIN TRANSACTION" 2>/dev/null
+}
+
+adapter::tx_commit() {
+  _sqlite::need || return 1
+  sqlite3 "$(_sqlite::path)" "COMMIT" 2>/dev/null
+}
+
+adapter::tx_rollback() {
+  _sqlite::need || return 1
+  sqlite3 "$(_sqlite::path)" "ROLLBACK" 2>/dev/null
+}
+
 # Load sub-modules
 source "${0:A:h}/query.zsh"
 source "${0:A:h}/schema.zsh"

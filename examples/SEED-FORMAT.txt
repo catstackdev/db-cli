@@ -1,0 +1,100 @@
+SEED FILE FORMAT
+================
+
+Seed files use a simple key=value format to define table structure and data generators.
+
+BASIC STRUCTURE
+---------------
+
+table = table_name          # Required: target table
+column_name = generator     # One or more column mappings
+rows = N                    # Required: number of rows to generate
+
+AVAILABLE GENERATORS
+--------------------
+
+name            Random first or last names
+                Example: John, Sarah, Michael, Emma
+
+email           Valid email addresses
+                Example: user123@example.com
+
+phone           Phone numbers in (XXX) XXX-XXXX format
+                Example: (555) 123-4567
+
+date            Dates from last 365 days in YYYY-MM-DD format
+                Example: 2025-01-15
+
+bool            Boolean values (true/false or 1/0)
+                Example: true, false
+
+status          Common status values
+                Example: active, inactive, pending, completed
+
+city            Major city names
+                Example: New York, London, Tokyo, Paris
+
+country         Country names
+                Example: USA, Canada, UK, Germany, Japan
+
+text            Short random text (10-50 chars)
+                Example: Lorem ipsum dolor sit amet
+
+int(min,max)    Random integer in range [min, max]
+                Example: int(1,100) → 42
+                Example: int(18,80) → 35
+
+COMPLETE EXAMPLE
+----------------
+
+# users.seed
+table = users
+first_name = name
+last_name = name
+email = email
+age = int(18,80)
+city = city
+status = status
+is_active = bool
+created_at = date
+rows = 100
+
+USAGE
+-----
+
+1. Create seed file (manual or via template):
+   db seed create users
+   
+2. Edit seed file to define columns and generators
+
+3. Run seed file to populate table:
+   db seed seeds/users.seed
+   
+4. List available seed files:
+   db seed list
+
+GENERATE COMMAND
+----------------
+
+Generate random data directly without seed files:
+
+db generate names 10        # Generate 10 random names
+db generate emails 5        # Generate 5 email addresses
+db generate phones 3        # Generate 3 phone numbers
+db generate dates 10        # Generate 10 random dates
+db generate bool 5          # Generate 5 boolean values
+db generate status 10       # Generate 10 status values
+db generate cities 8        # Generate 8 city names
+db generate countries 5     # Generate 5 country names
+db generate text 3          # Generate 3 text samples
+db generate int 10          # Generate 10 random integers
+
+NOTES
+-----
+
+- Comments start with #
+- Blank lines are ignored
+- Column order is preserved in INSERT
+- Generators are self-contained (no external dependencies)
+- Data is inserted in batches for performance
+- SQL identifiers are validated to prevent injection

@@ -96,13 +96,69 @@ backup & data:
                 export to csv/json
   cp SRC DEST   copy table
 
+data generation & seeding:
+  generate TYPE [N]
+                generate random data (names, emails, etc)
+  seed create TABLE
+                create seed file template
+  seed [FILE]   run seed file to populate table
+  seed list     list available seed files
+
 query tools:
   explain SQL   show query plan
-  hist [N]      query history
+  hist          query history & analytics
+  hist search P search history for pattern
+  hist slow [MS] slow queries (default >1000ms)
+  hist errors   failed queries
+  hist stats    query statistics
   last          re-run last query
   edit          edit & run query in $EDITOR
   watch SQL [S] repeat query every S seconds
-  migrate       run migrations (prisma/drizzle)
+  repl          interactive SQL mode
+
+migrations:
+  migrate       apply migrations (auto-detect tool)
+  migrate status show migration status
+  migrate up    apply pending migrations
+  migrate down  rollback last migration
+  migrate create N
+                create new migration
+  migrate detect
+                detect migration tool
+
+transactions:
+  tx begin      start transaction
+  tx commit     commit changes
+  tx rollback   rollback changes
+  tx status     show transaction state
+
+cache:
+  cache-info    show cache stats
+  cache-clear   clear cache
+  refresh-cache refresh table cache
+
+schema versioning:
+  schema-version save V
+                save current schema
+  schema-version restore V
+                restore schema from version
+  schema-version diff V1 [V2]
+                compare schemas
+  schema-version list
+                list saved versions
+  schema-version export [FILE]
+                export schema to file
+
+backup automation:
+  backup        create backup with auto cleanup
+  backup list   list all backups
+  backup cleanup [N]
+                keep only N most recent
+  backup verify FILE
+                verify backup integrity
+  backup restore FILE
+                restore from backup
+  backup cron   show cron setup
 
 config:
   init [FILE]   create .dbrc config
@@ -135,6 +191,9 @@ examples:
   db er                 ER diagram of all tables
   db import csv data.csv users
   db rename old_table new_table
+  db generate names 10  generate 10 random names
+  db seed create users  create seed template for users
+  db seed seeds/users.seed  populate users table
 EOF
 }
 

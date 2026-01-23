@@ -1,157 +1,117 @@
 #compdef db
 
-# Dynamic table completion
+# Cache tables for performance
 _db_tables() {
+  local cache_file="${XDG_CACHE_HOME:-$HOME/.cache}/db/completion_tables"
   local -a tables
-  if [[ -f .env ]]; then
-    tables=(${(f)"$(db t 2>/dev/null | tr -s ' \t' '\n' | grep -v '^$' | grep -v '^\-' | grep -v '^List' | grep -v '^Schema' | grep -v '^Name' | head -50)"})
-    [[ ${#tables} -gt 0 ]] && _describe 'table' tables
+  
+  # Use cache if fresh (<30s)
+  if [[ -f "$cache_file" && $(($(date +%s) - $(stat -f %m "$cache_file" 2>/dev/null || echo 0))) -lt 30 ]]; then
+    tables=(${(f)"$(cat "$cache_file")"})
+  else
+    if [[ -f .env ]]; then
+      tables=(${(f)"$(db t 2>/dev/null | tr -s ' \t' '\n' | grep -v '^$' | grep -v '^\-' | grep -v '^List' | grep -v '^Schema' | grep -v '^Name' | head -50)"})
+      mkdir -p "$(dirname "$cache_file")" 2>/dev/null
+      printf '%s\n' "${tables[@]}" > "$cache_file" 2>/dev/null
+    fi
   fi
-  return 0
+  [[ ${#tables} -gt 0 ]] && _describe 'table' tables
 }
 
-# Dynamic profile completion
+# Get columns for a table
+_db_columns() {
+  local table="$1"
+  local -a cols
+  cols=(${(f)"$(db schema "$table" 2>/dev/null | awk 'NR>2 && NF>0 && $1 !~ /^-/ {print $1}')"})
+  [[ ${#cols} -gt 0 ]] && _describe 'column' cols
+}
+
+# Profile completion
 _db_profiles() {
   local -a profiles
   profiles=(${(f)"$(db profiles 2>/dev/null | grep -v '^===' | grep -v '^no profiles' | cut -d: -f1)"})
   [[ ${#profiles} -gt 0 ]] && _describe 'profile' profiles
-  return 0
 }
 
-# Dynamic bookmark completion
+# Bookmark completion
 _db_bookmarks() {
   local -a bookmarks
-  bookmarks=(${(f)"$(db bookmarks 2>/dev/null | grep -v '^===' | grep -v '^no bookmarks' | awk '{print $1}')"})
+  if [[ -f "$HOME/.db_bookmarks" ]]; then
+    bookmarks=(${(f)"$(cut -d'|' -f1 "$HOME/.db_bookmarks" 2>/dev/null)"})
+  fi
   [[ ${#bookmarks} -gt 0 ]] && _describe 'bookmark' bookmarks
-  return 0
 }
 
 _db() {
   local -a cmds=(
-    # Connection
-    'psql:native client'
-    'p:native client'
-    'connect:interactive profile picker'
-    'url:show url'
-    'u:show url'
-    'info:show info'
-    'status:full status overview'
-    'test:test connection'
-    'ping:test connection'
-
-    # Query & Data
-    'query:execute sql'
-    'q:execute sql'
-    'tables:list tables'
-    't:list tables'
-    'schema:table schema'
-    'sample:preview rows'
-    's:preview rows'
-    'count:count rows'
-    'c:count rows'
-    'size:detailed table size'
-    'dbs:list databases'
-    'list:list databases'
-    'stats:database overview'
-    'top:largest tables'
-
-    # High-value commands
-    'desc:table overview (schema + stats + sample)'
-    'd:table overview'
-    'select:query table with columns'
-    'sel:query table with columns'
-    'where:filter rows by condition'
-    'import:import csv/json to table'
-    'er:generate ER diagram (mermaid)'
-    'recent:show recently queried tables'
-
-    # Data helpers
-    'agg:aggregate stats (count, min, max)'
-    'distinct:distinct values with counts'
-    'uniq:distinct values with counts'
-    'null:show null counts per column'
-    'nulls:show null counts per column'
-    'dup:find duplicate values'
-    'dups:find duplicate values'
-
-    # Schema & Structure
-    'indexes:show table indexes'
-    'fk:show foreign keys'
-    'search:search tables/columns'
-    'diff:compare schemas between profiles'
-    'users:list database users'
-    'grants:show table permissions'
-
-    # Schema Management
-    'rename:rename table'
-    'drop:drop table (with confirm)'
-    'comment:set/get table comment'
-
+    # Main commands
+    'query:execute sql' 'q:execute sql'
+    'tables:list tables' 't:list tables'
+    'schema:table schema' 'sample:preview rows' 's:preview rows'
+    'count:count rows' 'c:count rows'
+    'desc:table overview' 'd:table overview'
+    'select:query columns' 'sel:query columns'
+    'where:filter rows' 'agg:aggregate stats'
+    'distinct:distinct values' 'uniq:distinct values'
+    
+    # New features
+    'repl:interactive mode'
+    'tx:transaction management'
+    'hist:query history' 'history:query history'
+    'cache-info:cache stats' 'cache-clear:clear cache'
+    'refresh-cache:refresh cache' 'refresh:refresh cache'
+    
+    # Schema
+    'indexes:show indexes' 'fk:foreign keys'
+    'search:search schema' 'diff:compare schemas'
+    'rename:rename table' 'drop:drop table'
+    
     # Maintenance
-    'health:performance diagnostics'
-    'conn:active connections'
-    'connections:active connections'
-    'vacuum:run vacuum'
-    'analyze:update statistics'
-    'locks:show current locks'
-    'kill:terminate connection'
+    'health:diagnostics' 'conn:connections' 'vacuum:vacuum'
+    'analyze:update stats' 'locks:show locks' 'kill:kill connection'
     'slowlog:slow queries'
-
+    
     # Monitoring
-    'tail:watch recent rows (live)'
-    'changes:rows changed in last N hours'
-
-    # Backup & Data
-    'dump:backup'
-    'restore:restore backup'
-    'truncate:clear table'
-    'exec:execute sql file'
-    'e:execute sql file'
-    'export:export data'
-    'x:export data'
-    'copy:copy table'
-    'cp:copy table'
-
-    # Query Tools
-    'explain:query plan'
-    'history:query history'
-    'hist:query history'
-    'last:re-run last query'
-    'l:re-run last query'
-    'edit:edit query in editor'
-    'watch:repeat query'
-    'w:repeat query'
-    'migrate:run migrations'
-    'm:run migrations'
-
+    'tail:watch rows' 'changes:recent changes'
+    
+    # Backup
+    'dump:backup' 'restore:restore' 'truncate:clear'
+    'exec:execute file' 'e:execute file'
+    'export:export data' 'x:export data'
+    'import:import data' 'copy:copy table' 'cp:copy table'
+    
+    # Tools
+    'explain:query plan' 'last:last query' 'l:last query'
+    'edit:edit query' 'watch:repeat query' 'w:repeat query'
+    'migrate:migrations' 'm:migrations'
+    
+    # Data generation
+    'generate:generate random data' 'gen:generate random data'
+    'seed:populate tables' 'seeder:populate tables'
+    
     # Config
-    'init:create config file'
-    'config:manage config'
-    'profiles:list profiles'
-
+    'init:create config' 'config:manage config'
+    'profiles:list profiles' 'connect:pick profile'
+    
     # Bookmarks
-    'save:save query bookmark'
-    'run:run saved bookmark'
-    'bookmarks:list bookmarks'
-    'bm:list bookmarks'
-    'rm:remove bookmark'
-
+    'save:save bookmark' 'run:run bookmark'
+    'bookmarks:list bookmarks' 'bm:list bookmarks' 'rm:remove bookmark'
+    
     # Meta
-    'version:show version'
-    'v:show version'
-    'help:show help'
-    'h:show help'
+    'info:show info' 'status:full status' 'test:test connection'
+    'url:show url' 'u:show url'
+    'version:version' 'v:version' 'help:help' 'h:help'
   )
 
   _arguments -C \
     '--env=[env file]:file:_files' \
-    '--var=[variable name]:var:(DATABASE_URL POSTGRES_URL MYSQL_URL MONGO_URI DB_CONNECTION)' \
+    '--var=[variable name]:var:(DATABASE_URL POSTGRES_URL MYSQL_URL MONGO_URI)' \
     '--url=[database url]:url:' \
-    '(-p --profile)'{-p,--profile}'[use profile]:profile:_db_profiles' \
-    '--format=[output format]:format:(table json csv)' \
+    '(-p --profile)'{-p,--profile}'[profile]:profile:_db_profiles' \
+    '--format=[output format]:format:(table json csv markdown yaml)' \
     '(-w --wide)'{-w,--wide}'[show all columns]' \
     '--cols=[max columns]:cols:(5 10 15 20)' \
-    '--col-width=[column width]:width:(20 30 50 80)' \
+    '--col-width=[column width]:width:(20 30 50 80 100)' \
     '(-v --verbose)'{-v,--verbose}'[verbose]' \
     '(-q --quiet)'{-q,--quiet}'[quiet]' \
     '(-V --version)'{-V,--version}'[version]' \
@@ -160,10 +120,12 @@ _db() {
 
   case $state in
     cmd)
-      # Handle @bookmark syntax
+      # @bookmark completion
       if [[ "$words[CURRENT]" == @* ]]; then
         local -a bm_list
-        bm_list=(${(f)"$(db bookmarks 2>/dev/null | grep -v '^===' | grep -v '^no bookmarks' | awk '{print "@"$1}')"})
+        if [[ -f "$HOME/.db_bookmarks" ]]; then
+          bm_list=(${(f)"$(cut -d'|' -f1 "$HOME/.db_bookmarks" 2>/dev/null | sed 's/^/@/')"})
+        fi
         [[ ${#bm_list} -gt 0 ]] && _describe 'bookmark' bm_list
       else
         _describe 'command' cmds
@@ -171,49 +133,91 @@ _db() {
       ;;
     args)
       local cmd=$words[2]
-      local pos=$((CURRENT - 2))  # position after command
+      local pos=$((CURRENT - 2))
 
       case $cmd in
-        # Commands that take table names
-        schema|count|c|sample|s|truncate|indexes|fk|size|grants|vacuum|analyze)
+        # Table + column completion
+        select|sel|where|agg|distinct|uniq|dup|dups)
+          case $pos in
+            1) _db_tables ;;
+            2) [[ -n "$words[3]" ]] && _db_columns "$words[3]" ;;
+          esac
+          ;;
+        
+        # Table only
+        schema|sample|s|count|c|desc|d|truncate|indexes|fk|size|grants|vacuum|analyze|drop|comment|tail|changes|null|nulls)
           _db_tables ;;
-        desc|d|agg|distinct|uniq|null|nulls|dup|dups)
-          _db_tables ;;
-        select|sel|where)
-          # First arg: table, then columns/conditions
-          (( pos == 1 )) && _db_tables ;;
+        
+        # Transaction subcommands
+        tx)
+          _values 'tx command' begin commit rollback status start c rb abort st ;;
+        
+        # History subcommands
+        hist|history)
+          _values 'hist command' search slow errors stats export clear list migrate s err l c x ;;
+        
+        # Generate types
+        generate|gen)
+          case $pos in
+            1) _values 'data type' name email phone date bool status city country text int ;;
+          esac
+          ;;
+        
+        # Seed subcommands
+        seed|seeder)
+          case $pos in
+            1) _values 'seed action' create list run
+               _files -g '*.seed' ;;
+            2) [[ "$words[3]" == "create" ]] && _db_tables ;;
+          esac
+          ;;
+        
+        # Config subcommands
+        config)
+          case $pos in
+            1) _values 'config action' show get set edit validate reset ;;
+          esac
+          ;;
+        
+        # Rename: old table -> new name
         rename)
-          # First arg: old table, second arg: new name
           (( pos == 1 )) && _db_tables ;;
-        drop|comment|tail|changes)
-          _db_tables ;;
-        # File operations
-        restore) _files -g '*.sql' -g '*.db' ;;
-        exec|e) _files -g '*.sql' ;;
+        
+        # Copy: src table -> dest name
+        copy|cp)
+          (( pos == 1 )) && _db_tables ;;
+        
+        # Import: format -> file -> table
         import)
-          # import <format> <file> [table]
           case $pos in
             1) _values 'format' csv json ;;
             2) _files -g '*.csv' -g '*.json' ;;
             3) _db_tables ;;
           esac
           ;;
+        
+        # Export: format -> query
         export|x)
-          # export <format> "query"
           (( pos == 1 )) && _values 'format' csv json ;;
-        # Table as second arg
-        copy|cp) _db_tables ;;
-        # Config operations
-        init) _values 'target' global project ;;
-        config) _values 'action' show get set edit ;;
+        
+        # Files
+        restore) _files -g '*.sql' -g '*.db' ;;
+        exec|e) _files -g '*.sql' ;;
+        
         # Profiles
-        diff) _db_profiles ;;
-        run) _db_bookmarks ;;
-        rm) _db_bookmarks ;;
-        # No completion needed
-        kill|search|er|recent) ;;
-        @*) ;;  # Bookmark already selected
-        *) _default ;;
+        diff)
+          _db_profiles ;;
+        
+        # Bookmarks
+        run|rm)
+          _db_bookmarks ;;
+        
+        # Init
+        init)
+          _values 'target' global project ;;
+        
+        # No further completion
+        *) ;;
       esac
       ;;
   esac

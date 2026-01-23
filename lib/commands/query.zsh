@@ -1,17 +1,23 @@
 # db - Query commands
-# @commands: query, explain, watch, edit, last, history
+# @commands: query, explain, watch, edit, last
 
 cmd::query() {
   [[ -z "$1" ]] && {
     echo "usage: db query <sql>"
     return 1
   }
-  echo "[$(date '+%Y-%m-%d %H:%M')] $1" >>"$DB_HISTORY_FILE"
-  # Trim history if too large
-  if [[ -f "$DB_HISTORY_FILE" ]] && (($(wc -l <"$DB_HISTORY_FILE") > DB_HISTORY_SIZE)); then
-    tail -n "$DB_HISTORY_SIZE" "$DB_HISTORY_FILE" >"${DB_HISTORY_FILE}.tmp" && mv "${DB_HISTORY_FILE}.tmp" "$DB_HISTORY_FILE"
+  
+  # Use timed query with history recording if history module loaded
+  if typeset -f history::record &>/dev/null; then
+    cmd::query_timed "$1"
+  else
+    # Fallback to simple history
+    echo "[$(date '+%Y-%m-%d %H:%M')] $1" >>"$DB_HISTORY_FILE"
+    if [[ -f "$DB_HISTORY_FILE" ]] && (($(wc -l <"$DB_HISTORY_FILE") > DB_HISTORY_SIZE)); then
+      tail -n "$DB_HISTORY_SIZE" "$DB_HISTORY_FILE" >"${DB_HISTORY_FILE}.tmp" && mv "${DB_HISTORY_FILE}.tmp" "$DB_HISTORY_FILE"
+    fi
+    adapter::query "$1"
   fi
-  adapter::query "$1"
 }
 
 cmd::explain() {
@@ -52,11 +58,6 @@ cmd::edit() {
   rm -f "$tmpfile"
 }
 
-cmd::history() {
-  local n="${1:-20}"
-  [[ -f "$DB_HISTORY_FILE" ]] && tail -n "$n" "$DB_HISTORY_FILE" || echo "no history"
-}
-
 cmd::last() {
   [[ ! -f "$DB_HISTORY_FILE" ]] && {
     db::err "no history"
@@ -65,20 +66,4 @@ cmd::last() {
   local sql=$(tail -1 "$DB_HISTORY_FILE" | sed 's/^\[[^]]*\] //')
   db::log "re-running: $sql"
   adapter::query "$sql"
-}
-
-cmd::migrate() {
-  if [[ -f package.json ]] && grep -q prisma package.json 2>/dev/null; then
-    db::log "running prisma migrate..."
-    command -v pnpm &>/dev/null && pnpm prisma migrate deploy || npx prisma migrate deploy
-  elif [[ -f drizzle.config.ts || -f drizzle.config.js ]]; then
-    db::log "running drizzle push..."
-    command -v pnpm &>/dev/null && pnpm drizzle-kit push || npx drizzle-kit push
-  elif [[ -d migrations ]]; then
-    db::log "migrations/ found - run your tool manually"
-    ls migrations/
-  else
-    db::err "no migration tool detected"
-    return 1
-  fi
 }

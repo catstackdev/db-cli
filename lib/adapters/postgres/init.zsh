@@ -79,6 +79,22 @@ adapter::exec() {
   psql "$DB_URL" < "$1"
 }
 
+# Transaction support
+adapter::tx_begin() {
+  _pg::need || return 1
+  psql "$DB_URL" -c "BEGIN" >/dev/null
+}
+
+adapter::tx_commit() {
+  _pg::need || return 1
+  psql "$DB_URL" -c "COMMIT" >/dev/null
+}
+
+adapter::tx_rollback() {
+  _pg::need || return 1
+  psql "$DB_URL" -c "ROLLBACK" >/dev/null
+}
+
 # Load sub-modules
 source "${0:A:h}/query.zsh"
 source "${0:A:h}/schema.zsh"

@@ -1,0 +1,30 @@
+# Seed file for orders table
+# Demonstrates various generator types
+# Run with: db seed examples/seeds/orders.seed
+
+table = orders
+
+# Order identification
+order_id = int(1000,9999)
+customer_email = email
+
+# Order details
+product_name = text
+quantity = int(1,10)
+price = int(5,500)
+
+# Status and timestamps
+status = status
+order_date = date
+shipped_date = date
+is_paid = bool
+
+# Location
+ship_city = city
+ship_country = country
+
+# Optional fields
+tracking_number = phone
+notes = text
+
+rows = 100

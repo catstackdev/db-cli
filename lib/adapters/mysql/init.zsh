@@ -80,6 +80,22 @@ adapter::exec() {
   mysql "$DB_URL" < "$1"
 }
 
+# Transaction support
+adapter::tx_begin() {
+  _mysql::need || return 1
+  mysql "$DB_URL" -e "START TRANSACTION" 2>/dev/null
+}
+
+adapter::tx_commit() {
+  _mysql::need || return 1
+  mysql "$DB_URL" -e "COMMIT" 2>/dev/null
+}
+
+adapter::tx_rollback() {
+  _mysql::need || return 1
+  mysql "$DB_URL" -e "ROLLBACK" 2>/dev/null
+}
+
 # Load sub-modules
 source "${0:A:h}/query.zsh"
 source "${0:A:h}/schema.zsh"

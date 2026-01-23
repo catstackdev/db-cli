@@ -74,6 +74,22 @@ adapter::exec() {
   mongosh "$DB_URL" < "$1"
 }
 
+# Transaction support (requires replica set)
+adapter::tx_begin() {
+  _mongo::need || return 1
+  mongosh "$DB_URL" --quiet --eval "session = db.getMongo().startSession(); session.startTransaction();" 2>/dev/null
+}
+
+adapter::tx_commit() {
+  _mongo::need || return 1
+  mongosh "$DB_URL" --quiet --eval "session.commitTransaction(); session.endSession();" 2>/dev/null
+}
+
+adapter::tx_rollback() {
+  _mongo::need || return 1
+  mongosh "$DB_URL" --quiet --eval "session.abortTransaction(); session.endSession();" 2>/dev/null
+}
+
 # Load sub-modules
 source "${0:A:h}/query.zsh"
 source "${0:A:h}/schema.zsh"

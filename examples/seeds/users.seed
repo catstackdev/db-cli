@@ -1,0 +1,28 @@
+# Seed file for users table
+# Format: column_name = generator_type
+# Run with: db seed examples/seeds/users.seed
+
+table = users
+
+# Basic user fields
+first_name = name
+last_name = name
+email = email
+phone = phone
+
+# Account status and dates
+status = status
+is_active = bool
+created_at = date
+last_login = date
+
+# Location data
+city = city
+country = country
+
+# Sample text fields
+bio = text
+age = int(18,80)
+
+# Number of rows to generate
+rows = 50
