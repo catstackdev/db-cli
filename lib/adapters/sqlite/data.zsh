@@ -36,10 +36,30 @@ adapter::nulls() {
   db::valid_id "$table" || return 1
 
   echo "${C_BLUE}=== NULL counts in $table ===${C_RESET}"
-  sqlite3 "$(_sqlite::path)" "PRAGMA table_info($table)" | while IFS='|' read -r _ col _ _ _ _; do
-    local null_count=$(sqlite3 "$(_sqlite::path)" "SELECT COUNT(*) FROM $table WHERE $col IS NULL")
-    [[ "$null_count" -gt 0 ]] && echo "$col: $null_count NULLs"
+  
+  # Build single query with COUNT(CASE WHEN ...) for each column
+  local -a cols_arr
+  IFS=$'\n' read -rA cols_arr < <(sqlite3 "$(_sqlite::path)" "PRAGMA table_info($table)" | cut -d'|' -f2)
+  
+  local cols=""
+  local first=1
+  for col in "${cols_arr[@]}"; do
+    [[ $first -eq 0 ]] && cols+=", "
+    cols+="COUNT(CASE WHEN \"$col\" IS NULL THEN 1 END) AS \"$col\""
+    first=0
   done
+  
+  # Execute single query and parse results
+  sqlite3 "$(_sqlite::path)" "SELECT $cols FROM $table" | {
+    IFS='|' read -rA counts
+    
+    local i=1
+    for col in "${cols_arr[@]}"; do
+      local count="${counts[$i]}"
+      [[ "$count" -gt 0 ]] && echo "$col: $count NULLs"
+      ((i++))
+    done
+  }
 }
 
 adapter::dup() {

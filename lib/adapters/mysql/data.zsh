@@ -36,13 +36,37 @@ adapter::nulls() {
   db::valid_id "$table" || return 1
 
   echo "${C_BLUE}=== NULL counts in $table ===${C_RESET}"
-  mysql "$DB_URL" -sN -e "
-    SELECT COLUMN_NAME FROM information_schema.COLUMNS
+  
+  # Build single query with COUNT(CASE WHEN ...) for each column
+  local cols=$(mysql "$DB_URL" -sN -e "
+    SELECT GROUP_CONCAT(
+      CONCAT('COUNT(CASE WHEN \`', COLUMN_NAME, '\` IS NULL THEN 1 END) AS \`', COLUMN_NAME, '\`')
+      SEPARATOR ', '
+    )
+    FROM information_schema.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$table'
-  " | while read -r col; do
-    local null_count=$(mysql "$DB_URL" -sN -e "SELECT COUNT(*) FROM $table WHERE $col IS NULL")
-    [[ "$null_count" -gt 0 ]] && echo "$col: $null_count NULLs"
-  done
+    ORDER BY ORDINAL_POSITION
+  ")
+  
+  # Execute single query and parse results
+  mysql "$DB_URL" -sN -e "SELECT $cols FROM $table" | {
+    IFS=$'\t' read -rA counts
+    
+    local -a column_names
+    IFS=$'\n' read -rA column_names < <(mysql "$DB_URL" -sN -e "
+      SELECT COLUMN_NAME
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$table'
+      ORDER BY ORDINAL_POSITION
+    ")
+    
+    local i=1
+    for col in "${column_names[@]}"; do
+      local count="${counts[$i]}"
+      [[ "$count" -gt 0 ]] && echo "$col: $count NULLs"
+      ((i++))
+    done
+  }
 }
 
 adapter::dup() {

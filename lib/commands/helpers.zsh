@@ -2,11 +2,7 @@
 # @commands: desc, select, where, agg, distinct, null, dup, recent
 
 cmd::desc() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db desc <table>"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db desc <table>") || return 1
   echo "${C_BLUE}=== Schema ===${C_RESET}"
   adapter::schema "$table"
   echo ""
@@ -18,11 +14,7 @@ cmd::desc() {
 }
 
 cmd::select() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db select <table> [col1,col2,...] [limit]"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db select <table> [col1,col2,...] [limit]") || return 1
   shift
   db::valid_id "$table" || return 1
   
@@ -56,7 +48,14 @@ cmd::select() {
 cmd::where() {
   [[ -z "$1" ]] && {
     echo "usage: db where <table> <col=val> [col2=val2] ..."
-    echo "example: db where users email=test@example.com"
+    echo "       db where <table> <col>operator<val> ..."
+    echo ""
+    echo "operators: = != > < >= <= ~~ (LIKE) !~~ (NOT LIKE)"
+    echo ""
+    echo "examples:"
+    echo "  db where users email=test@example.com"
+    echo "  db where users age>=18 status=active"
+    echo "  db where users name~~'%john%'"
     return 1
   }
   local table="$1"
@@ -65,17 +64,56 @@ cmd::where() {
 
   local conditions=""
   for cond in "$@"; do
-    local col="${cond%%=*}"
-    local val="${cond#*=}"
+    # Parse condition with multiple operators
+    local col="" op="" val=""
+    
+    # Try operators in order: >=, <=, !=, !~~, ~~, =, >, <
+    if [[ "$cond" =~ '^([a-zA-Z_][a-zA-Z0-9_]*)(>=|<=|!=|!~~|~~|=|>|<)(.+)$' ]]; then
+      col="${match[1]}"
+      op="${match[2]}"
+      val="${match[3]}"
+    else
+      db::err "invalid condition format: $cond"
+      db::err "expected: column=value or column>=value etc."
+      return 1
+    fi
     
     # Validate column name to prevent SQL injection
     db::valid_id "$col" || return 1
     
-    # Escape single quotes in value
+    # Map operators to SQL
+    case "$op" in
+      "="|"!="|">"|"<"|">="|"<=") 
+        # Standard comparison operators
+        ;;
+      "~~") 
+        op="LIKE"
+        ;;
+      "!~~") 
+        op="NOT LIKE"
+        ;;
+      *)
+        db::err "unsupported operator: $op"
+        return 1
+        ;;
+    esac
+    
+    # Escape single quotes in value (prevent quote breakout)
     val="${val//\'/\'\'}"
     
+    # Detect if value should be numeric or string
+    # Numeric: digits only, optionally with decimal point
+    local sql_val
+    if [[ "$val" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+      # Numeric value - no quotes
+      sql_val="$val"
+    else
+      # String value - quote it
+      sql_val="'$val'"
+    fi
+    
     [[ -n "$conditions" ]] && conditions+=" AND "
-    conditions+="$col = '$val'"
+    conditions+="$col $op $sql_val"
   done
 
   [[ -z "$conditions" ]] && {
@@ -89,11 +127,7 @@ cmd::where() {
 }
 
 cmd::agg() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db agg <table> [column]"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db agg <table> [column]") || return 1
   local col="$2"
 
   if [[ -n "$col" ]]; then
@@ -104,11 +138,7 @@ cmd::agg() {
 }
 
 cmd::distinct() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db distinct <table> <column>"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db distinct <table> <column>") || return 1
   local col="$2"
   [[ -z "$col" ]] && {
     echo "usage: db distinct <table> <column>"
@@ -119,20 +149,12 @@ cmd::distinct() {
 }
 
 cmd::nulls() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db null <table>"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db null <table>") || return 1
   adapter::nulls "$table"
 }
 
 cmd::dup() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db dup <table> <column>"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db dup <table> <column>") || return 1
   local col="$2"
   [[ -z "$col" ]] && {
     echo "usage: db dup <table> <column>"

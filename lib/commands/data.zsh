@@ -6,38 +6,22 @@ cmd::tables() {
 }
 
 cmd::schema() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db schema <table>"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db schema <table>") || return 1
   adapter::schema "$table"
 }
 
 cmd::sample() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db sample <table> [limit]"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db sample <table> [limit]") || return 1
   adapter::sample "$table" "${2:-$DB_SAMPLE_LIMIT}" | db::table
 }
 
 cmd::count() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db count <table>"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db count <table>") || return 1
   adapter::count "$table"
 }
 
 cmd::table_size() {
-  local table="${1:-$(db::fzf_table)}"
-  [[ -z "$table" ]] && {
-    echo "usage: db size <table>"
-    return 1
-  }
+  local table=$(db::require_table "$1" "db size <table>") || return 1
   adapter::table_size "$table"
 }
 

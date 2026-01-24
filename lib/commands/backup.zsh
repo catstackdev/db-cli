@@ -10,6 +10,13 @@ cmd::restore() {
     echo "usage: db restore <file>"
     return 1
   }
+  
+  if ! db::dry_run "RESTORE database from backup" \
+    "File: $1" \
+    "This will overwrite current database"; then
+    return 0
+  fi
+  
   if [[ $DB_QUIET -eq 0 ]]; then
     echo -n "restore from $1? [y/N] "
     read -r ans
@@ -27,6 +34,13 @@ cmd::truncate() {
     echo "usage: db truncate <table>"
     return 1
   }
+  
+  if ! db::dry_run "TRUNCATE table" \
+    "Table: $table" \
+    "All rows will be deleted (structure remains)"; then
+    return 0
+  fi
+  
   if [[ $DB_QUIET -eq 0 ]]; then
     echo -n "truncate $table? [y/N] "
     read -r ans
@@ -43,6 +57,15 @@ cmd::exec() {
     echo "usage: db exec <file.sql>"
     return 1
   }
+  
+  local lines=$(wc -l < "$1" | tr -d ' ')
+  if ! db::dry_run "EXECUTE SQL file" \
+    "File: $1" \
+    "Lines: $lines" \
+    "Preview: $(head -3 "$1" | sed 's/^/  /')"; then
+    return 0
+  fi
+  
   adapter::exec "$1"
 }
 
@@ -76,6 +99,15 @@ cmd::import() {
     return 1
   }
   db::valid_id "$table" || return 1
+
+  local lines=$(wc -l < "$file" | tr -d ' ')
+  if ! db::dry_run "IMPORT data into table" \
+    "Format: $format" \
+    "File: $file" \
+    "Table: $table" \
+    "Rows: ~$lines"; then
+    return 0
+  fi
 
   adapter::import "$format" "$file" "$table"
 }

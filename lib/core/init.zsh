@@ -29,6 +29,7 @@ typeset -g DB_URL=""
 typeset -g DB_TYPE=""
 typeset -g DB_VERBOSE=0
 typeset -g DB_QUIET=0
+typeset -g DB_DRY_RUN=0
 
 # Track loaded modules for lazy loading
 typeset -gA DB_LOADED_MODULES=()

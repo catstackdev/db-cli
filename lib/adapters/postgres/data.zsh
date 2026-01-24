@@ -37,14 +37,39 @@ adapter::nulls() {
   db::valid_id "$table" || return 1
 
   echo "${C_BLUE}=== NULL counts in $table ===${C_RESET}"
-  psql "$DB_URL" -tAc "
-    SELECT column_name
+  
+  # Build single query with COUNT(CASE WHEN ...) for each column
+  local cols=$(psql "$DB_URL" -tAc "
+    SELECT string_agg(
+      'COUNT(CASE WHEN ' || column_name || ' IS NULL THEN 1 END) as \"' || column_name || '\"',
+      ', '
+    )
     FROM information_schema.columns
     WHERE table_schema = '$DB_SCHEMA' AND table_name = '$table'
-  " | while read -r col; do
-    local null_count=$(psql "$DB_URL" -tAc "SELECT COUNT(*) FROM $table WHERE $col IS NULL")
-    [[ "$null_count" -gt 0 ]] && echo "$col: $null_count NULLs"
-  done
+    ORDER BY ordinal_position
+  ")
+  
+  # Execute single query and transpose results
+  psql "$DB_URL" -tAc "SELECT $cols FROM $table" | {
+    local -a counts
+    IFS='|' read -rA counts
+    
+    local -a column_names
+    IFS=$'\n' read -rA column_names < <(psql "$DB_URL" -tAc "
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = '$DB_SCHEMA' AND table_name = '$table'
+      ORDER BY ordinal_position
+    ")
+    
+    local i=1
+    for col in "${column_names[@]}"; do
+      local count="${counts[$i]## }"
+      count="${count%% }"
+      [[ "$count" -gt 0 ]] && echo "$col: $count NULLs"
+      ((i++))
+    done
+  }
 }
 
 adapter::dup() {

@@ -7,13 +7,22 @@ cmd::save() {
     return 1
   }
   local name="$1" sql="$2"
+  
+  # Create directory and set secure permissions
+  local old_umask=$(umask)
+  umask 077
   mkdir -p "$(dirname "$DB_BOOKMARKS_FILE")"
+  
   # Remove existing bookmark with same name
   if [[ -f "$DB_BOOKMARKS_FILE" ]]; then
     grep -v "^$name	" "$DB_BOOKMARKS_FILE" >"${DB_BOOKMARKS_FILE}.tmp" 2>/dev/null
     mv "${DB_BOOKMARKS_FILE}.tmp" "$DB_BOOKMARKS_FILE"
   fi
+  
   echo "$name	$sql" >>"$DB_BOOKMARKS_FILE"
+  chmod 600 "$DB_BOOKMARKS_FILE"
+  
+  umask "$old_umask"
   db::ok "saved: $name"
 }
 

@@ -89,9 +89,38 @@ db::timed() {
   fi
 }
 
+# Dry-run mode: show what would be executed without doing it
+db::dry_run() {
+  local operation="$1"
+  shift
+  
+  if [[ $DB_DRY_RUN -eq 1 ]]; then
+    echo "${C_YELLOW}[DRY RUN]${C_RESET} Would execute: $operation"
+    for arg in "$@"; do
+      echo "${C_DIM}  → $arg${C_RESET}"
+    done
+    return 1  # Return non-zero to prevent actual execution
+  fi
+  return 0  # Continue with actual execution
+}
+
+# Require table argument with optional fzf fallback
+db::require_table() {
+  local table="${1:-$(db::fzf_table)}"
+  [[ -z "$table" ]] && {
+    echo "usage: ${2:-db <command> <table>}"
+    return 1
+  }
+  echo "$table"
+}
+
 # Confirm destructive action
 db::confirm() {
   local action="$1"
+  
+  # Skip confirmation in dry-run mode (just preview)
+  [[ $DB_DRY_RUN -eq 1 ]] && return 0
+  
   [[ "$DB_CONFIRM_DESTRUCTIVE" != "true" ]] && return 0
   [[ $DB_QUIET -eq 1 ]] && return 0
   echo -n "$action? [y/N] "

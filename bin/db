@@ -60,6 +60,7 @@ while [[ $# -gt 0 ]]; do
     -w|--wide) DB_COL_WIDTH=0; DB_MAX_COLS=0; shift ;;
     --cols=*) DB_MAX_COLS="${1#*=}"; shift ;;
     --col-width=*) DB_COL_WIDTH="${1#*=}"; shift ;;
+    --dry-run) DB_DRY_RUN=1; shift ;;
     *) cmd_args+=("$1"); shift ;;
   esac
 done

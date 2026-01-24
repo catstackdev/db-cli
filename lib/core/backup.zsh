@@ -10,7 +10,11 @@ backup::create() {
   local timestamp=$(date +%Y%m%d-%H%M%S)
   local filename="${name}-${timestamp}"
   
+  # Create backup directory with secure permissions
+  local old_umask=$(umask)
+  umask 077
   mkdir -p "$DB_BACKUP_DIR"
+  umask "$old_umask"
   
   db::log "creating backup: $filename"
   
@@ -37,14 +41,21 @@ backup::create() {
   local exit_code=$?
   
   if [[ $exit_code -eq 0 ]]; then
-    # Compress backup
+    # Compress backup and secure permissions
     if [[ "$DB_TYPE" == "mongodb" ]]; then
       tar -czf "$DB_BACKUP_DIR/${filename}.tar.gz" -C "$DB_BACKUP_DIR" "$filename" 2>/dev/null
       rm -rf "$DB_BACKUP_DIR/$filename"
+      chmod 600 "$DB_BACKUP_DIR/${filename}.tar.gz" 2>/dev/null
       echo "$filename.tar.gz"
     else
       gzip "$DB_BACKUP_DIR/${filename}.sql" 2>/dev/null || gzip "$DB_BACKUP_DIR/${filename}.db" 2>/dev/null
-      [[ -f "$DB_BACKUP_DIR/${filename}.sql.gz" ]] && echo "${filename}.sql.gz" || echo "${filename}.db.gz"
+      if [[ -f "$DB_BACKUP_DIR/${filename}.sql.gz" ]]; then
+        chmod 600 "$DB_BACKUP_DIR/${filename}.sql.gz"
+        echo "${filename}.sql.gz"
+      elif [[ -f "$DB_BACKUP_DIR/${filename}.db.gz" ]]; then
+        chmod 600 "$DB_BACKUP_DIR/${filename}.db.gz"
+        echo "${filename}.db.gz"
+      fi
     fi
   else
     db::err "backup failed"

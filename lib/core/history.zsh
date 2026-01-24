@@ -18,8 +18,18 @@ history::record() {
 EOF
 )
   
+  # Ensure history files are created with secure permissions
+  local old_umask=$(umask)
+  umask 077
+  
   echo "$entry" >> "$DB_HISTORY_JSON"
   echo "$query" >> "$DB_HISTORY_FILE"
+  
+  # Fix permissions on existing files
+  [[ -f "$DB_HISTORY_JSON" ]] && chmod 600 "$DB_HISTORY_JSON"
+  [[ -f "$DB_HISTORY_FILE" ]] && chmod 600 "$DB_HISTORY_FILE"
+  
+  umask "$old_umask"
 }
 
 # Search history

@@ -50,11 +50,42 @@ adapter::nulls() {
     const doc = db.$collection.findOne();
     if (doc) {
       const fields = Object.keys(doc);
+      
+      // Single aggregation query for all fields
+      const pipeline = [
+        {
+          \$facet: Object.fromEntries(
+            fields.map(f => [
+              f,
+              [
+                {
+                  \$group: {
+                    _id: null,
+                    nullCount: {
+                      \$sum: {
+                        \$cond: [
+                          { \$or: [{ \$eq: ['\$' + f, null] }, { \$eq: ['\$' + f, ''] }] },
+                          1,
+                          0
+                        ]
+                      }
+                    },
+                    missingCount: {
+                      \$sum: { \$cond: [{ \$ifNull: ['\$' + f, null] }, 0, 1] }
+                    }
+                  }
+                }
+              ]
+            ])
+          )
+        }
+      ];
+      
+      const results = db.$collection.aggregate(pipeline).toArray()[0];
       fields.forEach(f => {
-        const nullCount = db.$collection.countDocuments({ [f]: { \$in: [null, ''] } });
-        const missingCount = db.$collection.countDocuments({ [f]: { \$exists: false } });
-        if (nullCount > 0 || missingCount > 0) {
-          print(f + ': ' + nullCount + ' null, ' + missingCount + ' missing');
+        const stats = results[f][0];
+        if (stats && (stats.nullCount > 0 || stats.missingCount > 0)) {
+          print(f + ': ' + stats.nullCount + ' null, ' + stats.missingCount + ' missing');
         }
       });
     }"
