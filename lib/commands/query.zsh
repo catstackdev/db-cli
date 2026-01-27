@@ -44,7 +44,7 @@ cmd::watch() {
 }
 
 cmd::edit() {
-  local tmpfile=$(mktemp /tmp/db-query.XXXXXX.sql)
+  local tmpfile=$(mktemp "$DB_TMP_DIR/db-query.XXXXXX.sql")
   # Pre-fill with last query if exists
   if [[ -f "$DB_HISTORY_FILE" ]]; then
     tail -1 "$DB_HISTORY_FILE" | sed 's/^\[[^]]*\] //' >"$tmpfile"

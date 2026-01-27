@@ -98,17 +98,21 @@ cmd::where() {
         ;;
     esac
     
-    # Escape single quotes in value (prevent quote breakout)
+    # Escape value to prevent SQL injection
+    # 1. Escape single quotes (standard SQL escaping)
     val="${val//\'/\'\'}"
+    # 2. Escape backslashes to prevent escape sequences
+    val="${val//\\/\\\\}"
     
     # Detect if value should be numeric or string
-    # Numeric: digits only, optionally with decimal point
+    # Numeric: optional minus, digits, optional decimal point and digits
+    # More strict validation to prevent injection via "1 OR 1=1"
     local sql_val
-    if [[ "$val" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
-      # Numeric value - no quotes
+    if [[ "$val" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] && [[ ! "$val" =~ [[:space:]] ]]; then
+      # Pure numeric value - no quotes needed
       sql_val="$val"
     else
-      # String value - quote it
+      # String value - quote it (now with escaped quotes and backslashes)
       sql_val="'$val'"
     fi
     

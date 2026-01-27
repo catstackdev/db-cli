@@ -8,6 +8,19 @@ db::ok()   { [[ $DB_QUIET -eq 0 ]] && echo "${C_GREEN}ok${C_RESET}: $*"; }
 db::log()  { [[ $DB_QUIET -eq 0 ]] && echo "$*"; }
 db::dbg()  { [[ $DB_VERBOSE -eq 1 ]] && echo "${C_DIM}$*${C_RESET}"; }
 
+# Enhanced error with diagnostic hints
+db::err_diagnostic() {
+  local error_msg="$1"
+  shift
+  
+  db::err "$error_msg"
+  
+  # Show diagnostic hints
+  for hint in "$@"; do
+    echo "${C_DIM}  → $hint${C_RESET}" >&2
+  done
+}
+
 # Get editor (runtime resolution)
 db::editor() {
   # Priority: DB_EDITOR > VISUAL > EDITOR > nvim > vim
@@ -32,9 +45,96 @@ db::need() {
   return 1
 }
 
+# Retry a command with exponential backoff
+# Usage: db::retry <max_attempts> <command> [args...]
+db::retry() {
+  local max_attempts="$1"
+  shift
+  local attempt=1
+  local delay=1
+  
+  while [[ $attempt -le $max_attempts ]]; do
+    if "$@"; then
+      return 0
+    fi
+    
+    if [[ $attempt -lt $max_attempts ]]; then
+      db::dbg "attempt $attempt/$max_attempts failed, retrying in ${delay}s..."
+      sleep "$delay"
+      delay=$((delay * 2))  # Exponential backoff
+      [[ $delay -gt 30 ]] && delay=30  # Cap at 30 seconds
+    fi
+    
+    ((attempt++))
+  done
+  
+  db::err "failed after $max_attempts attempts"
+  return 1
+}
+
 # Mask password in URL
 db::mask() {
   echo "$1" | sed -E 's|://([^:]+):([^@]+)@|://\1:***@|g'
+}
+
+# Parse database URL into components (prevents password exposure in process list)
+# Usage: eval $(db::parse_url_safe "$DB_URL")
+# Sets: DB_SCHEME, DB_USER, DB_PASS, DB_HOST, DB_PORT, DB_NAME
+db::parse_url_safe() {
+  local url="$1"
+  
+  # Extract scheme (postgres, mysql, sqlite, mongodb)
+  local scheme="${url%%://*}"
+  
+  # Extract everything after scheme://
+  local rest="${url#*://}"
+  
+  # Check for credentials
+  local creds="" host_part=""
+  if [[ "$rest" =~ @ ]]; then
+    creds="${rest%%@*}"
+    host_part="${rest#*@}"
+  else
+    host_part="$rest"
+  fi
+  
+  # Parse credentials
+  local user="" pass=""
+  if [[ -n "$creds" ]]; then
+    user="${creds%%:*}"
+    pass="${creds#*:}"
+  fi
+  
+  # Parse host:port/database
+  local host="" port="" dbname=""
+  local host_db="${host_part%%\?*}"  # Strip query params
+  
+  # For SQLite, path is the database
+  if [[ "$scheme" == "sqlite" ]]; then
+    dbname="${host_db#/}"
+  else
+    # Extract database name
+    if [[ "$host_db" =~ / ]]; then
+      dbname="${host_db##*/}"
+      host_db="${host_db%/*}"
+    fi
+    
+    # Extract host and port
+    if [[ "$host_db" =~ : ]]; then
+      host="${host_db%%:*}"
+      port="${host_db##*:}"
+    else
+      host="$host_db"
+    fi
+  fi
+  
+  # Output as eval-able assignments
+  echo "DB_SCHEME='$scheme'"
+  echo "DB_USER='$user'"
+  echo "DB_PASS='$pass'"
+  echo "DB_HOST='$host'"
+  echo "DB_PORT='$port'"
+  echo "DB_NAME='$dbname'"
 }
 
 # Validate SQL identifier (prevents injection)
@@ -42,20 +142,11 @@ db::valid_id() {
   [[ "$1" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || { db::err "invalid identifier: $1"; return 1; }
 }
 
-# Validate numeric input
-db::valid_num() {
-  local num="$1"
-  local name="${2:-number}"
-  [[ "$num" =~ ^[0-9]+$ ]] || { db::err "invalid $name: $num"; return 1; }
-}
-
-# Validate positive number with range
-db::valid_range() {
-  local num="$1" min="${2:-1}" max="${3:-}"
-  db::valid_num "$num" || return $?
-  [[ $num -ge $min ]] || { db::err "must be >= $min"; return 1; }
-  [[ -z "$max" || $num -le $max ]] || { db::err "must be <= $max"; return 1; }
-}
+# Note: Numeric validation functions moved to base.zsh
+# Use base::valid_num() and base::valid_range() instead
+# Keeping these as aliases for backward compatibility
+db::valid_num() { base::valid_num "$@"; }
+db::valid_range() { base::valid_range "$@"; }
 
 # FZF table picker (used when no table arg provided)
 db::fzf_table() {
@@ -87,6 +178,49 @@ db::timed() {
   else
     "$@"
   fi
+}
+
+# Show progress indicator for long-running operations
+# Usage: db::progress "message" & pid=$!; <long_operation>; kill $pid 2>/dev/null
+db::progress() {
+  local message="${1:-Working}"
+  [[ $DB_QUIET -eq 1 ]] && return
+  
+  local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+  local frame=0
+  
+  while true; do
+    printf "\r${C_BLUE}${frames[$frame]}${C_RESET} $message..." >&2
+    frame=$(( (frame + 1) % ${#frames[@]} ))
+    sleep 0.1
+  done
+}
+
+# Run command with progress indicator
+# Usage: db::with_progress "Loading data" command arg1 arg2
+db::with_progress() {
+  local message="$1"
+  shift
+  
+  if [[ $DB_QUIET -eq 1 ]] || [[ ! -t 2 ]]; then
+    # No progress in quiet mode or non-terminal
+    "$@"
+    return $?
+  fi
+  
+  db::progress "$message" & 
+  local progress_pid=$!
+  
+  # Run the command
+  "$@"
+  local rc=$?
+  
+  # Stop progress indicator
+  kill $progress_pid 2>/dev/null
+  wait $progress_pid 2>/dev/null
+  printf "\r\033[K" >&2  # Clear the progress line
+  
+  return $rc
 }
 
 # Dry-run mode: show what would be executed without doing it
@@ -139,6 +273,42 @@ db::load_module() {
   source "$module_file"
   DB_LOADED_MODULES[$module]=1
   db::dbg "loaded module: $module"
+}
+
+# Query cancellation support
+# Stores current backend PID for query cancellation
+typeset -g DB_CURRENT_PID=""
+
+# Setup SIGINT trap for query cancellation
+db::setup_cancel_trap() {
+  trap 'db::cancel_query' INT
+}
+
+# Cancel running query
+db::cancel_query() {
+  if [[ -n "$DB_CURRENT_PID" ]]; then
+    db::warn "cancelling query (PID: $DB_CURRENT_PID)..."
+    
+    # Database-specific cancellation
+    case "$DB_TYPE" in
+      postgres|postgresql)
+        # Use pg_cancel_backend for graceful cancellation
+        _pg::exec -c "SELECT pg_cancel_backend($DB_CURRENT_PID)" &>/dev/null
+        ;;
+      mysql)
+        # Use KILL QUERY for MySQL
+        mysql "$DB_URL" -e "KILL QUERY $DB_CURRENT_PID" &>/dev/null
+        ;;
+      *)
+        # Fallback: kill the process
+        kill -INT "$DB_CURRENT_PID" 2>/dev/null
+        ;;
+    esac
+    
+    DB_CURRENT_PID=""
+    echo ""  # New line after ^C
+    return 130  # Standard exit code for SIGINT
+  fi
 }
 
 # Load adapter for database type

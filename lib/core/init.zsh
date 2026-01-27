@@ -24,6 +24,16 @@ readonly DB_GLOBAL_RC="${XDG_CONFIG_HOME:-$HOME/.config}/db/.dbrc"
 readonly DB_PROJECT_RC=".dbrc"
 readonly DB_PLUGINS_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/db/plugins"
 
+# Secure temp directory (use XDG_RUNTIME_DIR for better security)
+if [[ -n "${XDG_RUNTIME_DIR:-}" && -d "$XDG_RUNTIME_DIR" ]]; then
+  readonly DB_TMP_DIR="$XDG_RUNTIME_DIR/db"
+else
+  readonly DB_TMP_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/db/tmp"
+fi
+# Ensure tmp dir exists with secure permissions
+[[ -d "$DB_TMP_DIR" ]] || mkdir -p "$DB_TMP_DIR"
+chmod 700 "$DB_TMP_DIR" 2>/dev/null || true
+
 # State (set by db::init)
 typeset -g DB_URL=""
 typeset -g DB_TYPE=""

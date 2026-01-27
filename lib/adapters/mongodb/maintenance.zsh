@@ -66,11 +66,12 @@ adapter::vacuum() {
 }
 
 adapter::analyze() {
-  _mongo::need || return 1
   if [[ -n "$1" ]]; then
-    db::valid_id "$1" || return 1
-    mongosh "$DB_URL" --quiet --eval "db.$1.validate()" && db::ok "validated: $1"
+    local collection="$1"
+    _mongo::valid_collection "$collection" || return 1
+    _mongo::eval_safe "$collection" "db.${collection}.validate()" && db::ok "validated: $collection"
   else
+    _mongo::need || return 1
     mongosh "$DB_URL" --quiet --eval "
       const cols = db.getCollectionNames();
       cols.forEach(c => {

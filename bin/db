@@ -17,6 +17,7 @@ source "$DB_ROOT/lib/core/migration.zsh"
 source "$DB_ROOT/lib/core/schema.zsh"
 source "$DB_ROOT/lib/core/backup.zsh"
 source "$DB_ROOT/lib/core/seed.zsh"
+source "$DB_ROOT/lib/core/audit.zsh"
 source "$DB_ROOT/lib/adapters/base.zsh"
 source "$DB_ROOT/lib/dispatch.zsh"
 
@@ -25,6 +26,9 @@ db::load_config
 
 # Load plugins
 db::load_plugins
+
+# Setup query cancellation trap
+db::setup_cancel_trap
 
 # Handle help early (no DB connection needed)
 if [[ "${1:-}" == (-h|--help|help|h) ]]; then
@@ -67,7 +71,7 @@ done
 
 # Commands that don't need DB connection
 case "${cmd_args[1]}" in
-  init|config|profiles|bookmarks|bm|save|rm|help|h|-h|--help|version|v|-V|--version|recent|cache-info|cache-clear|cache-stats|migrate|m|schema-version|sv|backup|hist|history|generate)
+  init|config|profiles|bookmarks|bm|save|rm|help|h|-h|--help|version|v|-V|--version|recent|cache-info|cache-clear|cache-stats|migrate|m|schema-version|sv|backup|hist|history|generate|selftest|doctor)
     db::run "${cmd_args[@]}"
     exit $?
     ;;

@@ -1,10 +1,10 @@
 # MongoDB adapter - Schema operations
 
 adapter::indexes() {
-  _mongo::need || return 1
-  db::valid_id "$1" || return 1
-  mongosh "$DB_URL" --quiet --eval "
-    const indexes = db.$1.getIndexes();
+  local collection="$1"
+  _mongo::valid_collection "$collection" || return 1
+  _mongo::eval_safe "$collection" "
+    const indexes = db.${collection}.getIndexes();
     indexes.forEach(idx => {
       print('name: ' + idx.name);
       print('keys: ' + JSON.stringify(idx.key));
@@ -51,13 +51,17 @@ adapter::grants() {
 }
 
 adapter::rename() {
-  _mongo::need || return 1
-  mongosh "$DB_URL" --quiet --eval "db.$1.renameCollection('$2')" && db::ok "renamed: $1 -> $2"
+  local old_name="$1"
+  local new_name="$2"
+  _mongo::valid_collection "$old_name" || return 1
+  _mongo::valid_collection "$new_name" || return 1
+  _mongo::eval_safe "$old_name" "db.${old_name}.renameCollection('${new_name}')" && db::ok "renamed: $old_name -> $new_name"
 }
 
 adapter::drop() {
-  _mongo::need || return 1
-  mongosh "$DB_URL" --quiet --eval "db.$1.drop()" && db::ok "dropped: $1"
+  local collection="$1"
+  _mongo::valid_collection "$collection" || return 1
+  _mongo::eval_safe "$collection" "db.${collection}.drop()" && db::ok "dropped: $collection"
 }
 
 adapter::comment() {

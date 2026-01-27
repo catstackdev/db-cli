@@ -90,7 +90,7 @@ schema::diff() {
   
   if [[ "$v2" == "current" ]]; then
     # Compare with current schema
-    local tmp=$(mktemp /tmp/db-schema.XXXXXX.sql)
+    local tmp=$(mktemp "$DB_TMP_DIR/db-schema.XXXXXX.sql")
     
     case "$DB_TYPE" in
       postgres) pg_dump "$DB_URL" --schema-only > "$tmp" ;;

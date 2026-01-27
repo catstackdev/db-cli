@@ -172,7 +172,7 @@ backup::restore_from() {
   # Decompress if needed
   local restore_file="$file"
   if [[ "${file:e}" == "gz" ]]; then
-    local tmp=$(mktemp /tmp/db-restore.XXXXXX)
+    local tmp=$(mktemp "$DB_TMP_DIR/db-restore.XXXXXX")
     gzip -dc "$file" > "$tmp"
     restore_file="$tmp"
   fi

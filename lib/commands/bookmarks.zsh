@@ -8,6 +8,13 @@ cmd::save() {
   }
   local name="$1" sql="$2"
   
+  # Validate bookmark name (prevent path traversal and injection)
+  if [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    db::err "invalid bookmark name: $name"
+    db::err "bookmark names must contain only alphanumeric, underscore, and hyphen"
+    return 1
+  fi
+  
   # Create directory and set secure permissions
   local old_umask=$(umask)
   umask 077
@@ -32,6 +39,13 @@ cmd::run_bookmark() {
     return 1
   }
   local name="$1"
+  
+  # Validate bookmark name before using in grep
+  if [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    db::err "invalid bookmark name: $name"
+    return 1
+  fi
+  
   [[ ! -f "$DB_BOOKMARKS_FILE" ]] && {
     db::err "no bookmarks"
     return 1
@@ -61,11 +75,19 @@ cmd::rm_bookmark() {
     echo "usage: db rm <name>"
     return 1
   }
+  local name="$1"
+  
+  # Validate bookmark name before using in grep
+  if [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    db::err "invalid bookmark name: $name"
+    return 1
+  fi
+  
   [[ ! -f "$DB_BOOKMARKS_FILE" ]] && {
     db::err "no bookmarks"
     return 1
   }
-  grep -v "^$1	" "$DB_BOOKMARKS_FILE" >"${DB_BOOKMARKS_FILE}.tmp"
+  grep -v "^$name	" "$DB_BOOKMARKS_FILE" >"${DB_BOOKMARKS_FILE}.tmp"
   mv "${DB_BOOKMARKS_FILE}.tmp" "$DB_BOOKMARKS_FILE"
-  db::ok "removed: $1"
+  db::ok "removed: $name"
 }

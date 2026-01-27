@@ -6,6 +6,38 @@ _mongo::need() {
   db::need mongosh "brew install mongosh"
 }
 
+# Helper: validate MongoDB collection name
+_mongo::valid_collection() {
+  local name="$1"
+  # MongoDB collection names must not contain: $ or null character, cannot start with system.
+  # Use same validation as SQL identifiers for safety
+  [[ "$name" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]] || {
+    db::err "invalid collection name: $name"
+    db::err "collection names must start with letter/underscore, contain only alphanumeric/underscore"
+    return 1
+  }
+  return 0
+}
+
+# Helper: execute mongosh with JavaScript file instead of --eval (safer)
+# Usage: _mongo::eval_safe "collection_name" "javascript_code"
+_mongo::eval_safe() {
+  _mongo::need || return 1
+  local collection="$1"
+  local js_code="$2"
+  
+  # Validate collection name before injection into JavaScript
+  _mongo::valid_collection "$collection" || return 1
+  
+  # Create temporary JavaScript file (more secure than --eval with string interpolation)
+  local tmp_js="${DB_TMP_DIR:-${TMPDIR:-/tmp}}/mongo-query-$$.js"
+  echo "$js_code" > "$tmp_js"
+  mongosh "$DB_URL" --quiet "$tmp_js"
+  local rc=$?
+  rm -f "$tmp_js"
+  return $rc
+}
+
 adapter::cli() {
   _mongo::need || return 1
   mongosh "$DB_URL"

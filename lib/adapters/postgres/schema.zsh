@@ -4,7 +4,7 @@
 adapter::indexes() {
   _pg::need || return 1
   db::valid_id "$1" || return 1
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT
       indexname as index,
       indexdef as definition
@@ -16,7 +16,7 @@ adapter::indexes() {
 adapter::fk() {
   _pg::need || return 1
   db::valid_id "$1" || return 1
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT
       tc.constraint_name as constraint,
       kcu.column_name as column,
@@ -34,7 +34,7 @@ adapter::fk() {
 
 adapter::users() {
   _pg::need || return 1
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT
       rolname as role,
       rolsuper as superuser,
@@ -49,7 +49,7 @@ adapter::users() {
 adapter::grants() {
   _pg::need || return 1
   db::valid_id "$1" || return 1
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT
       grantee,
       privilege_type,
@@ -61,24 +61,24 @@ adapter::grants() {
 
 adapter::rename() {
   _pg::need || return 1
-  psql "$DB_URL" -c "ALTER TABLE $1 RENAME TO $2" && db::ok "renamed: $1 -> $2"
+  _pg::exec -c "ALTER TABLE $1 RENAME TO $2" && db::ok "renamed: $1 -> $2"
 }
 
 adapter::drop() {
   _pg::need || return 1
-  psql "$DB_URL" -c "DROP TABLE $1" && db::ok "dropped: $1"
+  _pg::exec -c "DROP TABLE $1" && db::ok "dropped: $1"
 }
 
 adapter::comment() {
   _pg::need || return 1
   local table="$1" desc="$2"
-  psql "$DB_URL" -c "COMMENT ON TABLE $table IS '$desc'" && db::ok "comment added"
+  _pg::exec -c "COMMENT ON TABLE $table IS '$desc'" && db::ok "comment added"
 }
 
 adapter::get_comment() {
   _pg::need || return 1
   local table="$1"
-  psql "$DB_URL" -tAc "
+  _pg::exec -tAc "
     SELECT obj_description('$DB_SCHEMA.$table'::regclass, 'pg_class')"
 }
 
@@ -86,14 +86,14 @@ adapter::search() {
   _pg::need || return 1
   local pattern="$1"
   echo "${C_BLUE}=== Tables ===${C_RESET}"
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT table_name
     FROM information_schema.tables
     WHERE table_schema='$DB_SCHEMA'
       AND table_name ILIKE '%$pattern%'
     ORDER BY table_name"
   echo "${C_BLUE}=== Columns ===${C_RESET}"
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT table_name, column_name, data_type
     FROM information_schema.columns
     WHERE table_schema='$DB_SCHEMA'

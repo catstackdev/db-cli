@@ -52,6 +52,12 @@ typeset -gA DB_CMD_MODULE=(
 
   # config.zsh
   [init]=config [config]=config [profiles]=config [connect]=config
+  
+  # doctor.zsh
+  [doctor]=doctor
+  
+  # selftest.zsh
+  [selftest]=selftest
 
   # cache.zsh
   [cache-clear]=cache [cache-info]=cache [cache-stats]=cache 
@@ -130,6 +136,8 @@ db::run() {
       url|u) cmd::url ;;
       info) cmd::info ;;
       status) cmd::status ;;
+      doctor) cmd::doctor ;;
+      selftest) cmd::selftest ;;
 
       # Query
       q|query) cmd::query "$2" ;;

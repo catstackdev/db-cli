@@ -16,10 +16,10 @@ adapter::tables_plain() {
 }
 
 adapter::schema() {
-  _mongo::need || return 1
-  db::valid_id "$1" || return 1
-  mongosh "$DB_URL" --quiet --eval "
-    const doc = db.$1.findOne();
+  local collection="$1"
+  _mongo::valid_collection "$collection" || return 1
+  _mongo::eval_safe "$collection" "
+    const doc = db.${collection}.findOne();
     if (doc) {
       const schema = {};
       for (const [k, v] of Object.entries(doc)) {
@@ -32,22 +32,23 @@ adapter::schema() {
 }
 
 adapter::sample() {
-  _mongo::need || return 1
-  db::valid_id "$1" || return 1
-  mongosh "$DB_URL" --quiet --eval "db.$1.find().limit(${2:-10}).forEach(printjson)"
+  local collection="$1"
+  local limit="${2:-10}"
+  _mongo::valid_collection "$collection" || return 1
+  _mongo::eval_safe "$collection" "db.${collection}.find().limit($limit).forEach(printjson)"
 }
 
 adapter::count() {
-  _mongo::need || return 1
-  db::valid_id "$1" || return 1
-  mongosh "$DB_URL" --quiet --eval "db.$1.countDocuments()"
+  local collection="$1"
+  _mongo::valid_collection "$collection" || return 1
+  _mongo::eval_safe "$collection" "db.${collection}.countDocuments()"
 }
 
 adapter::table_size() {
-  _mongo::need || return 1
-  db::valid_id "$1" || return 1
-  mongosh "$DB_URL" --quiet --eval "
-    const stats = db.$1.stats();
+  local collection="$1"
+  _mongo::valid_collection "$collection" || return 1
+  _mongo::eval_safe "$collection" "
+    const stats = db.${collection}.stats();
     print('collection: ' + stats.ns);
     print('documents:  ' + stats.count);
     print('data_size:  ' + (stats.size / 1024 / 1024).toFixed(2) + ' MB');
@@ -69,14 +70,15 @@ adapter::export() {
 }
 
 adapter::copy() {
-  _mongo::need || return 1
-  db::valid_id "$1" || return 1
-  db::valid_id "$2" || return 1
-  mongosh "$DB_URL" --quiet --eval "db.$1.aggregate([{\$out: '$2'}])" && db::ok "copied: $1 -> $2"
+  local source="$1"
+  local dest="$2"
+  _mongo::valid_collection "$source" || return 1
+  _mongo::valid_collection "$dest" || return 1
+  _mongo::eval_safe "$source" "db.${source}.aggregate([{\$out: '${dest}'}])" && db::ok "copied: $source -> $dest"
 }
 
 adapter::truncate() {
-  _mongo::need || return 1
-  db::valid_id "$1" || return 1
-  mongosh "$DB_URL" --quiet --eval "db.$1.deleteMany({})" && db::ok "truncated: $1"
+  local collection="$1"
+  _mongo::valid_collection "$collection" || return 1
+  _mongo::eval_safe "$collection" "db.${collection}.deleteMany({})" && db::ok "truncated: $collection"
 }

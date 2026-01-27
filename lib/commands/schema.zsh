@@ -95,6 +95,10 @@ cmd::drop() {
   [[ -n "$row_count" ]] && echo "Rows: $row_count" && echo ""
 
   db::confirm "DROP TABLE $table (cannot be undone)" || { echo "cancelled"; return 1; }
+  
+  # Audit log before drop
+  audit::log "DROP" "$table" "rows: ${row_count:-unknown}"
+  
   adapter::drop "$table"
 }
 

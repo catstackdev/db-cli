@@ -25,6 +25,10 @@ cmd::restore() {
       return 1
     }
   fi
+  
+  # Audit log before restore
+  audit::log "RESTORE" "$1" "database restored from backup"
+  
   adapter::restore "$1"
 }
 
@@ -49,6 +53,10 @@ cmd::truncate() {
       return 1
     }
   fi
+  
+  # Audit log before truncate
+  audit::log "TRUNCATE" "$table" "all rows deleted"
+  
   adapter::truncate "$table"
 }
 

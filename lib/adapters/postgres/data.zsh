@@ -7,7 +7,7 @@ adapter::agg() {
   db::valid_id "$table" || return 1
 
   if [[ -n "$col" ]]; then
-    psql "$DB_URL" -c "
+    _pg::exec -c "
       SELECT
         COUNT(*) as count,
         COUNT(DISTINCT $col) as distinct_count,
@@ -15,7 +15,7 @@ adapter::agg() {
         MAX($col) as max
       FROM $table"
   else
-    psql "$DB_URL" -c "SELECT COUNT(*) as total_rows FROM $table"
+    _pg::exec -c "SELECT COUNT(*) as total_rows FROM $table"
   fi
 }
 
@@ -23,7 +23,7 @@ adapter::distinct() {
   _pg::need || return 1
   local table="$1" col="$2"
   db::valid_id "$table" || return 1
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT $col, COUNT(*) as count
     FROM $table
     GROUP BY $col
@@ -39,7 +39,7 @@ adapter::nulls() {
   echo "${C_BLUE}=== NULL counts in $table ===${C_RESET}"
   
   # Build single query with COUNT(CASE WHEN ...) for each column
-  local cols=$(psql "$DB_URL" -tAc "
+  local cols=$(_pg::exec -tAc "
     SELECT string_agg(
       'COUNT(CASE WHEN ' || column_name || ' IS NULL THEN 1 END) as \"' || column_name || '\"',
       ', '
@@ -50,12 +50,12 @@ adapter::nulls() {
   ")
   
   # Execute single query and transpose results
-  psql "$DB_URL" -tAc "SELECT $cols FROM $table" | {
+  _pg::exec -tAc "SELECT $cols FROM $table" | {
     local -a counts
     IFS='|' read -rA counts
     
     local -a column_names
-    IFS=$'\n' read -rA column_names < <(psql "$DB_URL" -tAc "
+    IFS=$'\n' read -rA column_names < <(_pg::exec -tAc "
       SELECT column_name
       FROM information_schema.columns
       WHERE table_schema = '$DB_SCHEMA' AND table_name = '$table'
@@ -76,7 +76,7 @@ adapter::dup() {
   _pg::need || return 1
   local table="$1" col="$2"
   db::valid_id "$table" || return 1
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT $col, COUNT(*) as count
     FROM $table
     GROUP BY $col
@@ -91,12 +91,12 @@ adapter::import() {
 
   case "$format" in
     csv)
-      psql "$DB_URL" -c "\\copy $table FROM '$file' WITH CSV HEADER" && \
+      _pg::exec -c "\\copy $table FROM '$file' WITH CSV HEADER" && \
         db::ok "imported $file to $table"
       ;;
     json)
       local data=$(cat "$file")
-      psql "$DB_URL" -c "
+      _pg::exec -c "
         INSERT INTO $table
         SELECT * FROM json_populate_recordset(null::$table, '$data'::json)
       " && db::ok "imported $file to $table"
@@ -115,7 +115,7 @@ adapter::er() {
 
   echo "erDiagram"
   # Get tables and their columns
-  psql "$DB_URL" -tAc "
+  _pg::exec -tAc "
     SELECT DISTINCT table_name
     FROM information_schema.tables
     WHERE table_schema = '$DB_SCHEMA' AND table_type = 'BASE TABLE'
@@ -123,7 +123,7 @@ adapter::er() {
   " | while read -r tbl; do
     [[ -n "$1" && "$tbl" != "$1" ]] && continue
     echo "    $tbl {"
-    psql "$DB_URL" -tAc "
+    _pg::exec -tAc "
       SELECT column_name || ' ' || data_type
       FROM information_schema.columns
       WHERE table_schema = '$DB_SCHEMA' AND table_name = '$tbl'
@@ -135,7 +135,7 @@ adapter::er() {
   done
 
   # Get relationships
-  psql "$DB_URL" -tAc "
+  _pg::exec -tAc "
     SELECT
       tc.table_name,
       ccu.table_name AS foreign_table
@@ -158,7 +158,7 @@ adapter::tail() {
   db::valid_id "$table" || return 1
 
   # Try to find a timestamp or id column for ordering
-  local order_col=$(psql "$DB_URL" -tAc "
+  local order_col=$(_pg::exec -tAc "
     SELECT column_name FROM information_schema.columns
     WHERE table_schema = '$DB_SCHEMA' AND table_name = '$table'
       AND (column_name IN ('created_at', 'updated_at', 'timestamp', 'id', 'created', 'modified')
@@ -175,9 +175,9 @@ adapter::tail() {
   ")
 
   if [[ -n "$order_col" ]]; then
-    psql "$DB_URL" -c "SELECT * FROM $table ORDER BY $order_col DESC LIMIT $limit"
+    _pg::exec -c "SELECT * FROM $table ORDER BY $order_col DESC LIMIT $limit"
   else
-    psql "$DB_URL" -c "SELECT * FROM $table LIMIT $limit"
+    _pg::exec -c "SELECT * FROM $table LIMIT $limit"
   fi
 }
 
@@ -187,7 +187,7 @@ adapter::changes() {
   db::valid_id "$table" || return 1
 
   # Find timestamp column
-  local ts_col=$(psql "$DB_URL" -tAc "
+  local ts_col=$(_pg::exec -tAc "
     SELECT column_name FROM information_schema.columns
     WHERE table_schema = '$DB_SCHEMA' AND table_name = '$table'
       AND (column_name IN ('created_at', 'updated_at', 'timestamp', 'modified_at')
@@ -201,7 +201,7 @@ adapter::changes() {
   fi
 
   echo "${C_BLUE}=== Changes in last ${hours}h (by $ts_col) ===${C_RESET}"
-  psql "$DB_URL" -c "
+  _pg::exec -c "
     SELECT * FROM $table
     WHERE $ts_col > NOW() - INTERVAL '$hours hours'
     ORDER BY $ts_col DESC

@@ -101,6 +101,7 @@ _db() {
     'info:show info' 'status:full status' 'test:test connection'
     'url:show url' 'u:show url'
     'version:version' 'v:version' 'help:help' 'h:help'
+    'doctor:health check' 'selftest:run test suite'
   )
 
   _arguments -C \
