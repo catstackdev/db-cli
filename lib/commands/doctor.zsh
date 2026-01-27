@@ -10,18 +10,43 @@ cmd::doctor() {
   
   # Check 1: Database connectivity
   echo "${C_BLUE}[1/8]${C_RESET} Checking database connectivity..."
-  if adapter::test &>/dev/null; then
-    echo "  ${C_GREEN}✓${C_RESET} Connected to database"
-  else
-    echo "  ${C_RED}✗${C_RESET} Cannot connect to database"
+  if [[ -z "$DB_URL" ]]; then
+    echo "  ${C_YELLOW}!${C_RESET} No DATABASE_URL configured"
+    echo "    ${C_DIM}Set DATABASE_URL in .env or use --url flag${C_RESET}"
+    ((warnings++))
+  elif [[ -z "$DB_TYPE" ]]; then
+    echo "  ${C_RED}✗${C_RESET} Could not detect database type from URL"
     ((issues++))
+  else
+    # Capture test output for diagnostics
+    local test_output=$(adapter::test 2>&1)
+    local test_result=$?
+    
+    if [[ $test_result -eq 0 ]]; then
+      echo "  ${C_GREEN}✓${C_RESET} Connected to database"
+    else
+      echo "  ${C_RED}✗${C_RESET} Cannot connect to database"
+      
+      # Show first line of error for context
+      local first_error=$(echo "$test_output" | grep -E "error:|failed:|refused" | head -1)
+      if [[ -n "$first_error" ]]; then
+        echo "    ${C_DIM}$first_error${C_RESET}"
+      fi
+      echo "    ${C_DIM}Run 'db test' for full diagnostic${C_RESET}"
+      ((issues++))
+    fi
   fi
   echo ""
   
   # Check 2: Required tools
   echo "${C_BLUE}[2/8]${C_RESET} Checking required tools..."
-  case "$DB_TYPE" in
-    postgres|postgresql)
+  
+  if [[ -z "$DB_TYPE" ]]; then
+    echo "  ${C_YELLOW}!${C_RESET} No database type detected (skipping tool checks)"
+    ((warnings++))
+  else
+    case "$DB_TYPE" in
+      postgres|postgresql)
       if command -v psql &>/dev/null; then
         echo "  ${C_GREEN}✓${C_RESET} psql found: $(command -v psql)"
       else
@@ -79,7 +104,8 @@ cmd::doctor() {
         ((issues++))
       fi
       ;;
-  esac
+    esac
+  fi
   echo ""
   
   # Check 3: Config files

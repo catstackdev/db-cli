@@ -71,7 +71,7 @@ done
 
 # Commands that don't need DB connection
 case "${cmd_args[1]}" in
-  init|config|profiles|bookmarks|bm|save|rm|help|h|-h|--help|version|v|-V|--version|recent|cache-info|cache-clear|cache-stats|migrate|m|schema-version|sv|backup|hist|history|generate|selftest|doctor)
+  init|config|profiles|bookmarks|bm|save|rm|help|h|-h|--help|version|v|-V|--version|recent|cache-info|cache-clear|cache-stats|migrate|m|schema-version|sv|backup|hist|history|generate|selftest)
     db::run "${cmd_args[@]}"
     exit $?
     ;;
